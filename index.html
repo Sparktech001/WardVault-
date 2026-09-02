@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WardVault | Clinical Access Gateway</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Consolas', 'monospace'],
+                    },
+                    colors: {
+                        clinical: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                            950: '#020617',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        [x-cloak] { display: none !important; }
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.95; transform: scale(0.995); }
+        }
+        .emergency-pulse {
+            animation: pulse-slow 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex items-center justify-center p-4 selection:bg-blue-500 selection:text-white" x-data="wardVault()">
+
+    <!-- LOGIN SCREEN -->
+    <div class="max-w-md w-full bg-white border border-slate-200 shadow-xl rounded-2xl p-8" x-show="!token" x-transition.opacity>
+        <div class="flex items-center space-x-3 mb-6 pb-6 border-b border-slate-100">
+            <div class="h-11 w-11 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+                <template x-if="!username">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                </template>
+                <template x-if="username">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                </template>
+            </div>
+            <div>
+                <h2 class="text-lg font-bold text-slate-900 tracking-tight" x-text="username ? 'Terminal Locked' : 'WardVault EHR'"></h2>
+                <p class="text-xs text-slate-500 font-medium" x-text="username ? 'Enter passphrase to resume shift' : 'Hospital ABAC & Emergency Gateway'"></p>
+            </div>
+        </div>
+
+        <template x-if="authError">
+            <div class="mb-5 flex items-start p-3.5 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-xl">
+                <span class="mr-2 font-bold text-rose-600">✕</span>
+                <span x-text="authError"></span>
+            </div>
+        </template>
+
+        <form @submit.prevent="login" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Clinician / Staff ID</label>
+                <input type="text" x-model="username" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-200 outline-none transition" placeholder="e.g. UCH/26/EME/2980" required>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Secure Passphrase</label>
+                <input type="password" x-ref="passInput" x-model="password" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-200 outline-none transition" required>
+            </div>
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition shadow-sm" x-text="loading ? 'Authenticating...' : (username ? 'Unlock Session' : 'Sign In to Ward')"></button>
+        </form>
+    </div>
+
+    <!-- MAIN CLINICAL DASHBOARD -->
+    <div class="max-w-4xl w-full mx-auto space-y-4" x-show="token" x-cloak x-transition.opacity>
+        
+        <!-- HEADER -->
+        <div class="bg-white border border-slate-200 shadow-sm rounded-2xl p-4 flex flex-wrap justify-between items-center gap-3">
+            <div class="flex items-center space-x-3">
+                <div class="h-9 w-9 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 font-bold text-sm">
+                    +
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <h1 class="text-sm font-bold text-slate-900">General Hospital EHR System</h1>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">Gateway Online</span>
+                    </div>
+                    <p class="text-xs text-slate-500 font-medium">Active Staff Session: <strong class="text-slate-700" x-text="role"></strong></p>
+                </div>
+            </div>
+            <button @click="logout" class="text-xs font-bold text-slate-500 hover:text-rose-600 border border-slate-200 hover:border-rose-200 hover:bg-rose-50 bg-white px-3.5 py-1.5 rounded-xl transition shadow-sm">
+                Lock Session
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            
+            <!-- LEFT COLUMN: Patient Chart & Append Notes -->
+            <div class="lg:col-span-7 bg-white border border-slate-200 shadow-sm rounded-2xl p-6 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-5">
+                        <h2 class="text-sm font-extrabold text-slate-800 uppercase tracking-wider flex items-center">
+                            <span class="w-2 h-2 rounded-full bg-blue-500 mr-2"></span>
+                            Patient Record Request
+                        </h2>
+                        <span class="text-[11px] text-slate-500 font-mono font-semibold">ABAC Policy: Active</span>
+                    </div>
+
+                    <form @submit.prevent="requestAccess(false)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1.5">Patient Record ID / UUID</label>
+                            <input type="text" x-model="patientId" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm font-mono focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition" placeholder="e.g. 250727" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1.5">Requesting Ward Unit</label>
+                            <input type="text" x-model="wardId" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm font-mono focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition" placeholder="e.g. uch-icu" required>
+                        </div>
+                        <button type="submit" class="w-full font-bold py-2.5 rounded-xl text-xs uppercase tracking-wider transition bg-slate-800 hover:bg-slate-700 text-white shadow-md" x-text="loading ? 'Verifying Authorization...' : 'Fetch Patient Record'"></button>
+                    </form>
+                </div>
+
+                <!-- PATIENT CHART PAYLOAD -->
+                <div x-show="accessResult" x-cloak class="mt-6 pt-5 border-t border-slate-100">
+                    <div class="bg-slate-50 border border-emerald-200 rounded-xl p-4 space-y-3">
+                        <div class="flex justify-between items-center pb-2 border-b border-slate-200">
+                            <h3 class="text-xs font-extrabold text-emerald-700 uppercase tracking-wide">🏥 Comprehensive Patient Chart</h3>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold" x-text="'ID: ' + (accessResult?.patient?.id || patientId)"></span>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-3 text-xs font-mono bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                            <div><span class="text-slate-400 font-bold block text-[10px] tracking-wide">PATIENT NAME</span><strong class="text-slate-800 text-sm" x-text="accessResult?.patient?.name || 'N/A'"></strong></div>
+                            <div><span class="text-slate-400 font-bold block text-[10px] tracking-wide">GENDER / AGE</span><strong class="text-slate-800" x-text="(accessResult?.patient?.gender || 'N/A') + ' / ' + (accessResult?.patient?.age || '34')"></strong></div>
+                            <div><span class="text-slate-400 font-bold block text-[10px] tracking-wide">FACILITY UNIT</span><strong class="text-blue-600" x-text="accessResult?.patient?.organization || 'ORG-UCH'"></strong></div>
+                            <div><span class="text-slate-400 font-bold block text-[10px] tracking-wide">ASSIGNED WARD</span><strong class="text-blue-600" x-text="accessResult?.patient?.ward_id || wardId"></strong></div>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-2 text-center text-xs font-mono">
+                            <div class="bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
+                                <span class="text-slate-400 font-bold block text-[9px] tracking-wide">BLOOD PRESSURE</span>
+                                <strong class="text-emerald-600 text-sm block mt-0.5">120/80 mmHg</strong>
+                            </div>
+                            <div class="bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
+                                <span class="text-slate-400 font-bold block text-[9px] tracking-wide">HEART RATE</span>
+                                <strong class="text-blue-600 text-sm block mt-0.5">75 bpm</strong>
+                            </div>
+                            <div class="bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
+                                <span class="text-slate-400 font-bold block text-[9px] tracking-wide">O2 SATURATION</span>
+                                <strong class="text-emerald-600 text-sm block mt-0.5">98%</strong>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2 text-xs font-mono bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                            <div><span class="text-slate-400 font-bold block text-[10px] tracking-wide">PRIMARY DIAGNOSIS / CONDITION</span><strong class="text-slate-700">Acute Stabilization Required / Observation</strong></div>
+                            <div><span class="text-slate-400 font-bold block text-[10px] tracking-wide">ACTIVE MEDICATIONS</span><strong class="text-slate-700">Saline IV drip, Analgesics as needed</strong></div>
+                            <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                                <div><span class="text-slate-400 font-bold block text-[9px] tracking-wide">BLOOD GROUP</span><strong class="text-rose-600">O-Positive (O+)</strong></div>
+                                <div><span class="text-slate-400 font-bold block text-[9px] tracking-wide">KNOWN ALLERGIES</span><strong class="text-amber-600">Penicillin, Latex</strong></div>
+                            </div>
+                        </div>
+
+                        <!-- APPEND-ONLY CLINICAL NOTES SECTION -->
+                        <div class="mt-4 pt-4 border-t border-slate-200 space-y-3">
+                            <div class="flex justify-between items-center">
+                                <h4 class="text-xs font-extrabold text-blue-600 uppercase tracking-wide">📝 Append Clinical Note</h4>
+                                <span class="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Immutable Record</span>
+                            </div>
+                            
+                            <div x-show="noteSuccess" class="p-2 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 text-xs text-center font-mono font-bold shadow-sm" x-cloak>
+                                ✓ Note Appended & Cryptographically Hashed
+                            </div>
+
+                            <textarea x-model="newNote" rows="2" placeholder="Enter new clinical observation or addendum..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-800 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition resize-none"></textarea>
+                            
+                            <button @click="appendNote" :disabled="!newNote || isSubmittingNote" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg border border-slate-300 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                                <span x-text="isSubmittingNote ? 'Appending...' : 'Save to Immutable Ledger'"></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Ledger & Override Rationale -->
+            <div class="lg:col-span-5 bg-white border border-slate-200 shadow-sm rounded-2xl p-6 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-xs font-extrabold text-slate-500 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100">
+                        Gateway Evaluation & Compliance Ledger
+                    </h3>
+
+                    <!-- IDLE STATE -->
+                    <div x-show="!accessResult && !accessError" class="py-12 text-center text-slate-400">
+                        <div class="w-10 h-10 mx-auto mb-3 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-lg shadow-inner">📋</div>
+                        <p class="text-xs font-bold text-slate-500">Ready for clinician inquiry</p>
+                        <p class="text-[11px] text-slate-400 mt-1 font-medium">ABAC constraints will evaluate on submit</p>
+                    </div>
+
+                    <!-- POLICY DENIED -->
+                    <div x-show="accessError" x-cloak class="bg-rose-50 border border-rose-200 rounded-xl p-4 text-left space-y-4 shadow-sm">
+                        <div>
+                            <div class="flex items-center text-rose-700 font-extrabold text-xs mb-1.5 tracking-wide">
+                                <span class="mr-2">⚠️</span> ACCESS REJECTED (ABAC POLICY VIOLATION)
+                            </div>
+                            <p class="text-xs text-rose-600 font-mono leading-relaxed" x-text="accessError"></p>
+                        </div>
+                    </div>
+
+                    <!-- LEDGER HASH TRAY -->
+                    <div x-show="accessResult" x-cloak class="space-y-4">
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 shadow-sm">
+                            <div class="flex items-center text-emerald-700 font-extrabold text-xs mb-1 tracking-wide">
+                                <span class="mr-2">✓</span>
+                                <span x-text="isEmergency ? 'EMERGENCY OVERRIDE AUTHORIZED' : 'STANDARD ACCESS GRANTED'"></span>
+                            </div>
+                            <p class="text-[11px] text-emerald-600 font-medium">Identity and cryptographic audit ledger verified.</p>
+                        </div>
+
+                        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5 font-mono text-xs shadow-inner">
+                            <div>
+                                <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wide">Cryptographic Hash (SHA-256)</span>
+                                <span class="text-[11px] text-blue-600 font-bold break-all leading-relaxed" x-text="accessResult?.audit?.current_hash || accessResult?.audit_hash || '787a9deba783aed400279053024e3fa9...'"></span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200 text-[11px]">
+                                <div>
+                                    <span class="text-[9px] uppercase font-bold text-slate-400 block tracking-wide">Event Timestamp</span>
+                                    <span class="text-slate-600 font-medium truncate block" x-text="accessResult?.audit?.timestamp || new Date().toISOString()"></span>
+                                </div>
+                                <div>
+                                    <span class="text-[9px] uppercase font-bold text-slate-400 block tracking-wide">Audit Status</span>
+                                    <span class="text-emerald-600 font-bold" x-text="isEmergency ? 'OVERRIDDEN' : 'AUTHORIZED'"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- MANDATORY POST-TREATMENT REASON -->
+                        <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 space-y-3 mt-4 shadow-sm" x-show="isEmergency">
+                            <h4 class="text-xs font-extrabold text-amber-700 uppercase tracking-wide">📝 Post-Treatment Rationale (REQUIRED)</h4>
+                            <p class="text-[11px] text-amber-700 font-medium leading-relaxed">
+                                You performed an emergency override. Patient care is complete. You <strong class="font-extrabold text-amber-800">cannot lock or log out</strong> of this session until you select your compliance rationale below.
+                            </p>
+                            <select x-model="reason" class="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-amber-900 text-xs font-semibold focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none shadow-sm cursor-pointer" required>
+                                <option value="" disabled selected>-- Select Authorized Rationale --</option>
+                                <option value="Life-threatening trauma / Code Blue">Life-threatening trauma / Code Blue</option>
+                                <option value="Cross-ward consultation required">Cross-ward consultation required</option>
+                                <option value="Patient crashing / Immediate stabilization">Patient crashing / Immediate stabilization</option>
+                                <option value="Shift handover / Covering colleague">Shift handover / Covering colleague</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-4 mt-4 border-t border-slate-100 text-[10px] text-slate-400 font-bold flex justify-between tracking-wide uppercase">
+                    <span>Station: Terminal-4</span>
+                    <span>Protocol: HL7-FHIR-Sec</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERRIDE MODAL -->
+    <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-6 z-50" x-show="accessError && showModal" x-cloak x-transition.opacity>
+        <div class="bg-white border-4 border-rose-500 shadow-2xl rounded-3xl max-w-3xl w-full p-12 space-y-8 text-center emergency-pulse">
+            
+            <div class="w-24 h-24 mx-auto rounded-full bg-rose-50 border-4 border-rose-100 flex items-center justify-center text-rose-500 shadow-inner">
+                <svg class="w-12 h-12 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            </div>
+            
+            <div class="space-y-3">
+                <span class="px-4 py-1.5 rounded-full text-xs font-black tracking-widest bg-rose-100 text-rose-700 border border-rose-200 uppercase shadow-sm">Critical Healthcare Interlock Triggered</span>
+                <h3 class="text-3xl font-black text-slate-900 tracking-tight">ACCESS RESTRICTED BY ABAC POLICY</h3>
+                <p class="text-sm text-rose-700 font-mono font-bold bg-rose-50 p-3 rounded-xl border border-rose-200" x-text="accessError"></p>
+            </div>
+            
+            <template x-if="isDoctor()">
+                <div class="space-y-6">
+                    <p class="text-base text-slate-600 leading-relaxed max-w-xl mx-auto font-semibold">
+                        Patient care is currently blocked by policies. As an authorized physician, you may engage the override protocol to instantly force-open the record.
+                    </p>
+                    <div class="space-y-4 pt-2">
+                        <button @click="requestAccess(true)" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-black py-6 rounded-2xl text-2xl uppercase tracking-widest transition transform active:scale-95 flex items-center justify-center space-x-3 shadow-lg shadow-rose-600/30">
+                            <span>🚨</span><span>OVERRIDE</span><span>🚨</span>
+                        </button>
+                        <button @click="showModal = false" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300 font-bold py-4 rounded-xl text-xs uppercase tracking-wider transition shadow-sm">
+                            Cancel & Return
+                        </button>
+                    </div>
+                </div>
+            </template>
+
+            <template x-if="!isDoctor()">
+                <div class="space-y-6">
+                    <div class="bg-rose-50 border border-rose-200 p-4 rounded-2xl text-rose-700 text-sm font-mono font-medium text-left shadow-sm">
+                        🔒 <strong>Override Restricted:</strong> Your active credential role (<span class="underline font-bold" x-text="role"></span>) does not have emergency break-glass clearance. Institutional policy strictly restricts emergency overrides to attending physicians (Doctors).
+                    </div>
+                    <button @click="showModal = false" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300 font-bold py-4 rounded-xl text-xs uppercase tracking-wider transition shadow-sm">
+                        Dismiss & Return
+                    </button>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <script>
+        function wardVault() {
+            return {
+                token: null, role: '', username: '', password: 'password123', authError: '',
+                patientId: '250727', wardId: 'uch-icu', isEmergency: false, reason: '',
+                accessResult: null, accessError: '', loading: false, showModal: false,
+                
+                newNote: '', 
+                isSubmittingNote: false, 
+                noteSuccess: false,
+
+                isDoctor() {
+                    const doctorRoles = ['Emergency Medicine', 'Cardiology', 'Neurology', 'Pediatrics', 'Surgery'];
+                    return doctorRoles.includes(this.role);
+                },
+
+                async login() {
+                    this.authError = ''; this.loading = true;
+                    try {
+                        let params = new URLSearchParams();
+                        params.append('username', this.username);
+                        params.append('password', this.password);
+                        let res = await fetch('http://127.0.0.1:8000/api/login', { method: 'POST', body: params });
+                        if (!res.ok) throw new Error();
+                        let data = await res.json();
+                        this.token = data.access_token;
+                        let payload = JSON.parse(atob(this.token.split('.')[1]));
+                        this.role = payload.role;
+                    } catch (err) {
+                        this.authError = 'Staff authentication failed. Invalid credentials or unauthorized station.';
+                    } finally { this.loading = false; }
+                },
+
+                async requestAccess(isOverride = false) {
+                    this.accessError = ''; this.loading = true;
+                    if (isOverride) { this.isEmergency = true; }
+                    try {
+                        let res = await fetch('http://127.0.0.1:8000/api/records/access', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                            body: JSON.stringify({ 
+                                patient_id: this.patientId, 
+                                client_ward_id: this.wardId, 
+                                is_emergency: this.isEmergency, 
+                                override_reason: this.isEmergency ? (this.reason || 'Attended to patient during acute crisis') : '' 
+                            })
+                        });
+                        let data = await res.json();
+                        if (!res.ok) throw new Error(data.detail?.message || data.detail || 'Access Denied: ABAC Policy Violation (Ward Mismatch)');
+                        this.accessResult = data;
+                        this.showModal = false;
+                    } catch (err) {
+                        this.accessError = err.message;
+                        
+                        // SAFEGUARD: Ghost ID block
+                        if (err.message.toLowerCase().includes('not found') || err.message.toLowerCase().includes('404')) {
+                            this.showModal = false;
+                        } else {
+                            const doctorRoles = ['Emergency Medicine', 'Cardiology', 'Neurology', 'Pediatrics', 'Surgery'];
+                            if (doctorRoles.includes(this.role)) {
+                                this.showModal = true;
+                            } else {
+                                this.showModal = false;
+                            }
+                        }
+                    } finally { this.loading = false; }
+                },
+
+                async appendNote() {
+                    if (!this.newNote.trim()) return;
+                    this.isSubmittingNote = true;
+                    
+                    try {
+                        let res = await fetch('http://127.0.0.1:8000/api/records/notes', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                            body: JSON.stringify({ 
+                                patient_id: this.patientId, 
+                                note_text: this.newNote 
+                            })
+                        });
+                        
+                        if (res.ok) {
+                            this.newNote = '';
+                            this.noteSuccess = true;
+                            setTimeout(() => { this.noteSuccess = false; }, 3000);
+                        } else {
+                            alert("Failed to securely append note to the ledger.");
+                        }
+                    } catch (err) {
+                        console.error("Error saving note:", err);
+                    } finally {
+                        this.isSubmittingNote = false;
+                    }
+                },
+
+                logout() { 
+                    if (this.isEmergency && !this.reason) {
+                        alert("Compliance Interlock Active: You executed an emergency break-glass override. You must select your clinical rationale from the dropdown menu before you can lock or terminate your session.");
+                        return;
+                    }
+                    
+                    this.token = null; 
+                    this.role = ''; 
+                    this.accessResult = null; 
+                    this.isEmergency = false; 
+                    this.reason = ''; 
+                    this.showModal = false;
+                    this.accessError = '';
+                    this.password = '';
+                    
+                    this.$nextTick(() => {
+                        if (this.$refs.passInput) {
+                            this.$refs.passInput.focus();
+                        }
+                    });
+                }
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WardVault | SIEM Audit Ledger</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        body { background-color: #020617; } /* Deep clinical slate */
+        @keyframes flash {
+            0%, 100% { background-color: rgba(159, 18, 57, 0.2); }
+            50% { background-color: rgba(159, 18, 57, 0.8); }
+        }
+        .bg-flash { animation: flash 1.5s infinite; }
+    </style>
+</head>
+<body class="text-slate-200 font-sans antialiased min-h-screen p-6" x-data="logViewer()" x-init="fetchLogs()">
+
+    <div class="max-w-6xl mx-auto space-y-6">
+        
+        <!-- 🚨 VERIFICATION ALERT BANNERS (HIDDEN UNTIL BUTTON IS CLICKED) 🚨 -->
+        <div x-show="verifyStatus === 'SECURE'" x-cloak class="bg-emerald-950/80 border border-emerald-500 rounded-xl p-4 flex items-center shadow-lg shadow-emerald-900/20 transition-all">
+            <span class="text-emerald-400 text-2xl mr-4">✅</span>
+            <div>
+                <h3 class="text-emerald-400 font-bold tracking-wider uppercase text-sm">Ledger Verified</h3>
+                <p class="text-emerald-200/80 text-xs font-mono" x-text="verifyMessage"></p>
+            </div>
+        </div>
+
+        <div x-show="verifyStatus === 'COMPROMISED'" x-cloak class="bg-flash border-2 border-rose-500 rounded-xl p-6 flex items-center shadow-2xl shadow-rose-900/50 transition-all">
+            <span class="text-rose-400 text-4xl mr-6 animate-pulse">🚨</span>
+            <div>
+                <h3 class="text-white font-black tracking-widest uppercase text-xl mb-1">CRITICAL INTEGRITY FAILURE</h3>
+                <p class="text-rose-200 text-sm font-mono font-bold">TAMPERING DETECTED AT LOG ENTRY <span x-text="'#' + brokenEntry"></span></p>
+                <p class="text-rose-300 text-xs font-mono mt-1" x-text="verifyMessage"></p>
+            </div>
+        </div>
+
+        <!-- Admin Header -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex justify-between items-center shadow-lg">
+            <div class="flex items-center space-x-4">
+                <div class="h-10 w-10 rounded-lg bg-emerald-950 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                    🛡️
+                </div>
+                <div>
+                    <h1 class="text-base font-bold text-white tracking-wide">Chief Privacy Officer (CPO) Dashboard</h1>
+                    <p class="text-xs text-slate-400 font-mono">Immutable Cryptographic Audit Ledger</p>
+                </div>
+            </div>
+            
+            <div class="flex space-x-3">
+                <!-- THE LIVE DEMO BUTTON -->
+                <button @click="verifyLedger()" class="px-4 py-2 bg-indigo-900 hover:bg-indigo-800 text-indigo-200 text-xs font-bold uppercase tracking-wider rounded-lg transition border border-indigo-700 shadow-lg shadow-indigo-900/20">
+                    🔍 Scan Ledger Integrity
+                </button>
+                <button @click="fetchLogs()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg transition border border-slate-700 flex items-center">
+                    <span class="mr-2" :class="loading ? 'animate-spin' : ''">↻</span> Refresh Data
+                </button>
+            </div>
+        </div>
+
+        <!-- Log Table -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-950 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-bold">
+                            <th class="px-6 py-4">Timestamp</th>
+                            <th class="px-6 py-4">Provider (Actor)</th>
+                            <th class="px-6 py-4">Patient (Target)</th>
+                            <th class="px-6 py-4">Security Action</th>
+                            <th class="px-6 py-4">SHA-256 Audit Hash</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60">
+                        
+                        <template x-if="loading">
+                            <tr>
+                                <td colspan="5" class="px-6 py-8 text-center text-slate-500 text-sm">Loading secure logs...</td>
+                            </tr>
+                        </template>
+
+                        <template x-if="!loading && logs.length === 0">
+                            <tr>
+                                <td colspan="5" class="px-6 py-8 text-center text-slate-500 text-sm">No audit logs found in the ledger.</td>
+                            </tr>
+                        </template>
+
+                        <template x-for="log in logs" :key="log.current_hash">
+                            <!-- Highlights the row red if it matches the broken entry from the API -->
+                            <tr class="hover:bg-slate-800/30 transition text-xs font-mono" :class="brokenEntry == log.timestamp ? 'bg-rose-950/40 border-l-2 border-rose-500' : ''">
+                                <td class="px-6 py-4 text-slate-400 whitespace-nowrap" x-text="formatDate(log.timestamp)"></td>
+                                <td class="px-6 py-4 text-cyan-400 font-semibold" x-text="log.provider_id"></td>
+                                <td class="px-6 py-4 text-slate-300" x-text="log.patient_id"></td>
+                                <td class="px-6 py-4">
+                                    <span class="px-2 py-1 rounded text-[10px] font-bold" 
+                                        :class="log.action.includes('OVERRIDE') || log.action.includes('DENIED') ? 'bg-rose-950/60 text-rose-400 border border-rose-800/50' : (log.action.includes('ADMIN') ? 'bg-purple-950/60 text-purple-400 border border-purple-800/50' : 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/50')"
+                                        x-text="log.action">
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-[10px] text-slate-500 truncate max-w-xs" x-text="log.current_hash"></div>
+                                </td>
+                            </tr>
+                        </template>
+                        
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function logViewer() {
+            return {
+                logs: [],
+                loading: false,
+                verifyStatus: null, // 'SECURE' or 'COMPROMISED'
+                verifyMessage: '',
+                brokenEntry: null,
+                
+                async fetchLogs() {
+                    this.loading = true;
+                    try {
+                        let res = await fetch('http://127.0.0.1:8000/api/audit-logs');
+                        if (res.ok) {
+                            this.logs = await res.json();
+                        }
+                    } catch (err) {
+                        console.error("Failed to fetch logs", err);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                // NEW FUNCTION: Calls the verification API
+                async verifyLedger() {
+                    this.verifyStatus = null;
+                    try {
+                        let res = await fetch('http://127.0.0.1:8000/api/audit/verify');
+                        let data = await res.json();
+                        
+                        this.verifyStatus = data.status;
+                        if (data.status === 'COMPROMISED') {
+                            this.verifyMessage = data.detail;
+                            this.brokenEntry = data.broken_entry;
+                        } else {
+                            this.verifyMessage = data.message;
+                            this.brokenEntry = null;
+                            // Hide the success message after 5 seconds
+                            setTimeout(() => { this.verifyStatus = null; }, 5000);
+                        }
+                    } catch (err) {
+                        alert("Verification check failed to reach server.");
+                    }
+                },
+
+                // The crash-proof date formatter
+                formatDate(dateString) {
+                    if (!dateString || dateString === "N/A") return 'N/A';
+                    try {
+                        const date = new Date(dateString);
+                        if (isNaN(date.getTime())) return dateString; 
+                        return date.toLocaleString('en-GB', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    } catch (e) {
+                        return dateString;
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
