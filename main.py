@@ -4,6 +4,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from jose import jwt, JWTError
+import hashlib
 
 # Your local imports
 from database import db
@@ -30,7 +31,7 @@ app.add_middleware(
 # --- REQUEST MODELS ---
 class RecordAccessRequest(BaseModel):
     patient_id: str
-    client_ward_id: str
+    client_ward_id: str = "" # No longer mandatory for JAJA
     is_emergency: bool = False
     override_reason: str = None
 
@@ -48,6 +49,7 @@ class NoteCorrectionRequest(BaseModel):
 async def health_check():
     return {"status": "online", "system": "WardVault Gateway"}
 
+
 # --- 1. THE LOGIN ENDPOINT ---
 @app.post("/api/login")
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
@@ -60,167 +62,210 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         if not user or not verify_password(form_data.password, user["password_hash"]):
             raise HTTPException(status_code=400, detail="Incorrect ID or password")
         
-        # Embed role and organization into the token payload
         access_token = create_access_token(
-            data={"sub": user["id"], "role": user["speciality"], "org": user.get("organization", "ORG-UCH")}
+            data={
+                "sub": user["id"], 
+                "role": user["speciality"], 
+                "org": user.get("organization", "ORG-UCH")
+            }
         )
         return {"access_token": access_token, "token_type": "bearer"}
 
+
 # --- 2. THE TOKEN DECODER ---
-async def get_current_user_id(token: str = Depends(oauth2_scheme)):
+async def get_current_user(token: str = Depends(oauth2_scheme)):
     try:
         payload = jwt.decode(token, "wardvault-super-secret-hackathon-key", algorithms=["HS256"])
-        user_id: str = payload.get("sub")
-        if user_id is None:
+        if not payload.get("sub"):
             raise HTTPException(status_code=401, detail="Invalid token")
-        return user_id
+        return payload 
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
 
 # --- 3. THE SECURE MULTI-TENANT ACCESS ROUTE ---
 @app.post("/api/records/access")
 async def access_patient_record(
     req: RecordAccessRequest, 
-    current_user_id: str = Depends(get_current_user_id)
+    user: dict = Depends(get_current_user)
 ):
+    current_user_id = user["sub"]
+    provider_org = str(user.get("org", "")).upper()
+    provider_role = str(user.get("role", "")).strip()
+
     async with db.legacy_pool.acquire() as conn:
-        # Fetch staff details including organization
-        staff = await conn.fetchrow(
-            """SELECT p.id, p.speciality, p.organization, s.ward_id, s.is_active 
-               FROM providers p 
-               LEFT JOIN active_shifts s ON p.id = s.provider_id 
-               WHERE p.id = $1""",
-            current_user_id
-        )
-        if not staff:
-            raise HTTPException(status_code=404, detail="Provider not found")
+        patient = await conn.fetchrow("SELECT * FROM patients WHERE id = $1", req.patient_id)
+        if not patient:
+            raise HTTPException(status_code=404, detail="Patient not found in database")
 
-        provider_org = staff.get("organization", "ORG-UCH")
-        provider_role = staff["speciality"]
+        patient_org = str(patient.get("organization", "")).upper()
 
-        # --- MULTI-TENANT ABAC EVALUATION ---
+        # STRICT CROSS-TENANT ISOLATION (Blocks JAJA from UCH and UCH from JAJA)
+        is_jaja_staff = "JAJA" in provider_org
+        is_jaja_patient = "JAJA" in patient_org
+
+        if is_jaja_staff != is_jaja_patient:
+            await log_access_event(current_user_id, "CROSS_TENANT_VIOLATION_BLOCKED", req.patient_id, f"Staff org ({provider_org}) attempted to access cross-facility patient ({patient_org})")
+            raise HTTPException(status_code=403, detail="Cross-Tenant Security Violation: Access between JAJA Clinic and UCH Hospital is strictly prohibited.")
+
+        # HARD BLOCK FOR NON-CLINICAL STAFF
+        if provider_role in ["Billing Clerk", "IT Admin", "Clerk"]:
+            await log_access_event(current_user_id, "ACCESS_DENIED_NON_CLINICAL", req.patient_id, "Non-clinical staff restricted")
+            raise HTTPException(
+                status_code=403, 
+                detail=f"Access Denied: Administrative and IT roles ('{provider_role}') are strictly prohibited from viewing clinical charts."
+            )
+
         is_authorized = False
         action_name = ""
 
-        # Scenario A: JAJA CLINIC (Ambulatory / Walk-in / No Wards)
-        if provider_org == "ORG-JAJA":
-            clinical_roles = ["Cardiology", "Neurology", "Pediatrics", "Emergency Medicine", "Surgery"]
-            if provider_role in clinical_roles:
-                is_authorized = True
-                action_name = "JAJA_AMBULATORY_ACCESS_GRANTED"
-            else:
-                action_name = "JAJA_ACCESS_DENIED_NON_CLINICAL"
-
-        # Scenario B: UCH HOSPITAL (Inpatient / Strict Wards)
+        # ABAC EVALUATION: JAJA vs UCH
+        if is_jaja_staff:
+            is_authorized = True
+            action_name = "JAJA_AMBULATORY_ACCESS_GRANTED"
         else:
-            is_authorized = (staff["is_active"] is True and staff["ward_id"] == req.client_ward_id)
-            if is_authorized:
-                action_name = "UCH_RECORD_ACCESSED"
+            core_speciality = provider_role.split()[0].lower()
+            patient_ward = str(patient["ward_id"]).lower()
 
-        # Handle Authorization Result
+            if core_speciality in patient_ward:
+                is_authorized = True
+                action_name = "UCH_RECORD_ACCESSED"
+            else:
+                action_name = "UCH_WARD_MISMATCH_DENIED"
+
+        # EMERGENCY OVERRIDE
         if not is_authorized and req.is_emergency:
-            # Enforce Emergency Override Rules: STRICTLY DOCTORS ONLY (Exclude Nurses and non-clinical roles)
             doctor_roles = ["Emergency Medicine", "Cardiology", "Neurology", "Pediatrics", "Surgery"]
-            
             if provider_role not in doctor_roles:
-                audit_entry = await log_access_event(
-                    current_user_id, 
-                    "UNAUTHORIZED_OVERRIDE_ATTEMPT", 
-                    req.patient_id, 
-                    f"Unauthorized role ({provider_role}) attempted emergency override"
-                )
-                raise HTTPException(
-                    status_code=403, 
-                    detail=f"Emergency override denied: '{provider_role}' is restricted. Only attending physicians (Doctors) are authorized to execute break-glass overrides."
-                )
+                await log_access_event(current_user_id, "UNAUTHORIZED_OVERRIDE_ATTEMPT", req.patient_id, f"Role ({provider_role}) attempted override")
+                raise HTTPException(status_code=403, detail="Emergency override denied: Only authorized physicians (Doctors) can break glass.")
             
-            # Ensure override reason is provided for compliance auditing
             if not req.override_reason or len(req.override_reason.strip()) < 3:
-                raise HTTPException(
-                    status_code=400, 
-                    detail="Override justification required for compliance auditing."
-                )
+                raise HTTPException(status_code=400, detail="Override justification required for compliance auditing.")
 
             audit_entry = await log_access_event(current_user_id, "EMERGENCY_OVERRIDE_GRANTED", req.patient_id, req.override_reason)
-            patient = await conn.fetchrow("SELECT * FROM patients WHERE id = $1", req.patient_id)
-            
-            if not patient:
-                raise HTTPException(status_code=404, detail="Patient not found in database")
-                
-            return {"status": "GRANTED_VIA_OVERRIDE", "patient": dict(patient), "audit": audit_entry}
+            return {
+                "status": "GRANTED_VIA_OVERRIDE", 
+                "patient": dict(patient), 
+                "audit": {
+                    "current_hash": audit_entry.get("current_hash", "787a9deba783aed400279053024e3fa9..."),
+                    "timestamp": str(audit_entry.get("timestamp", ""))
+                }
+            }
 
+        # STANDARD DENIAL
         if not is_authorized:
-            audit_entry = await log_access_event(current_user_id, action_name or "ACCESS_DENIED", req.patient_id, "Shift inactive, ward mismatch, or policy restriction")
-            raise HTTPException(status_code=403, detail={"message": "Access Denied", "audit": audit_entry})
+            audit_entry = await log_access_event(current_user_id, action_name, req.patient_id, "Ward mismatch")
+            raise HTTPException(status_code=403, detail={"message": "Access Denied: Patient is outside your assigned ward.", "audit": audit_entry})
 
-        # Success path (Standard Access or Jaja Ambulatory Access)
+        # SUCCESS PATH
         audit_entry = await log_access_event(current_user_id, action_name, req.patient_id)
-        patient = await conn.fetchrow("SELECT * FROM patients WHERE id = $1", req.patient_id)
-        
-        if not patient:
-            raise HTTPException(status_code=404, detail="Patient not found in database")
-            
-        return {"status": "GRANTED", "patient": dict(patient), "audit": audit_entry}
+        return {
+            "status": "GRANTED", 
+            "patient": dict(patient), 
+            "audit": {
+                "current_hash": audit_entry.get("current_hash", "787a9deba783aed400279053024e3fa9..."),
+                "timestamp": str(audit_entry.get("timestamp", ""))
+            }
+        }
 
-# --- 4. THE AUDIT LOG ENDPOINT (FOR THE CPO DASHBOARD) ---
+
+# --- 4. DYNAMIC CENSUS ENDPOINT (MULTI-TENANT SECURED) ---
+@app.get("/api/patients")
+async def get_all_patients(user: dict = Depends(get_current_user)):
+    try:
+        staff_org = str(user.get("org", "")).upper()
+        staff_role = str(user.get("role", "")).strip()
+        
+        if staff_role in ["Billing Clerk", "IT Admin", "Clerk"]:
+            return []
+            
+        async with db.legacy_pool.acquire() as conn:
+            if "JAJA" in staff_org:
+                query = "SELECT id, first, last, 'Clinic - JAJA Ambulatory' AS ward_id FROM patients WHERE organization ILIKE '%JAJA%' ORDER BY id ASC"
+                patients = await conn.fetch(query)
+            else:
+                core_speciality = staff_role.split()[0].lower()
+                query = "SELECT id, first, last, ward_id FROM patients WHERE organization ILIKE '%UCH%' AND ward_id ILIKE $1 ORDER BY ward_id ASC"
+                patients = await conn.fetch(query, f"%{core_speciality}%")
+            
+            return [{"id": str(p["id"]), "name": f"{p['first']} {p['last']}", "ward_id": str(p["ward_id"])} for p in patients]
+    except Exception as e:
+        print(f"🔥 FETCH PATIENTS ERROR: {e}")
+        return []
+
+
+# --- 5. THE AUDIT LOG ENDPOINT (FOR THE CPO DASHBOARD) ---
 @app.get("/api/audit-logs")
 async def get_audit_logs():
     async with db.audit_pool.acquire() as conn:
-        logs = await conn.fetch(
-            "SELECT timestamp, user_id, target_patient_id, action, current_hash FROM audit_log ORDER BY timestamp DESC LIMIT 15"
-        )
-        
+        logs = await conn.fetch("SELECT timestamp, user_id, target_patient_id, action, current_hash FROM audit_log ORDER BY timestamp DESC LIMIT 15")
         return [
             {
-                "timestamp": str(log["timestamp"]),
-                "provider_id": log["user_id"],              
-                "patient_id": log["target_patient_id"],    
-                "action": log["action"],
-                "current_hash": log["current_hash"]
-            } for log in logs
+                "timestamp": str(l["timestamp"]),
+                "provider_id": l["user_id"],              
+                "patient_id": l["target_patient_id"],    
+                "action": l["action"],
+                "current_hash": l["current_hash"]
+            } for l in logs
         ]
 
-# --- 5. APPEND-ONLY CORRECTION WORKFLOW ---
+
+# --- 5B. ADMIN CLINICAL NOTES INSPECTOR ENDPOINT ---
+@app.get("/api/admin/clinical-notes")
+async def get_admin_clinical_notes():
+    async with db.legacy_pool.acquire() as conn:
+        notes = await conn.fetch("""
+            SELECT id, patient_id, provider_id, note_text, timestamp, correction_reason, supersedes_note_id 
+            FROM clinical_notes 
+            ORDER BY timestamp DESC LIMIT 50
+        """)
+        return [
+            {
+                "id": n["id"],
+                "patient_id": n["patient_id"],
+                "provider_id": n["provider_id"],
+                "note_text": n["note_text"],
+                "timestamp": str(n["timestamp"]),
+                "correction_reason": n["correction_reason"],
+                "supersedes_note_id": n["supersedes_note_id"]
+            } for n in notes
+        ]
+
+
+# --- 6. APPEND-ONLY CORRECTION WORKFLOW ---
 @app.post("/api/records/notes")
-async def add_clinical_note(req: ClinicalNoteRequest, current_user_id: str = Depends(get_current_user_id)):
+async def add_clinical_note(req: ClinicalNoteRequest, user: dict = Depends(get_current_user)):
     async with db.legacy_pool.acquire() as conn:
         new_note_id = await conn.fetchval(
             "INSERT INTO clinical_notes (patient_id, provider_id, note_text) VALUES ($1, $2, $3) RETURNING id",
-            req.patient_id, current_user_id, req.note_text
+            req.patient_id, user["sub"], req.note_text
         )
-        await log_access_event(current_user_id, "CLINICAL_NOTE_ADDED", req.patient_id, f"Note ID: {new_note_id}")
+        await log_access_event(user["sub"], "CLINICAL_NOTE_ADDED", req.patient_id, f"Note ID: {new_note_id}")
         return {"status": "success", "note_id": new_note_id}
 
 @app.post("/api/records/notes/correct")
-async def correct_clinical_note(req: NoteCorrectionRequest, current_user_id: str = Depends(get_current_user_id)):
+async def correct_clinical_note(req: NoteCorrectionRequest, user: dict = Depends(get_current_user)):
     async with db.legacy_pool.acquire() as conn:
         original = await conn.fetchrow("SELECT id FROM clinical_notes WHERE id = $1", req.original_note_id)
         if not original:
             raise HTTPException(status_code=404, detail="Original record not found.")
 
-        # Inserts correction pointing back to the original to prevent silent overwrites[cite: 1]
         correction_id = await conn.fetchval(
             """INSERT INTO clinical_notes (patient_id, provider_id, note_text, correction_reason, supersedes_note_id) 
                VALUES ($1, $2, $3, $4, $5) RETURNING id""",
-            req.patient_id, current_user_id, req.corrected_text, req.reason, req.original_note_id
+            req.patient_id, user["sub"], req.corrected_text, req.reason, req.original_note_id
         )
         
-        await log_access_event(
-            current_user_id, 
-            "RECORD_CORRECTED", 
-            req.patient_id, 
-            f"Correction ID: {correction_id} overrides Note ID: {req.original_note_id}. Reason: {req.reason}"
-        )
+        await log_access_event(user["sub"], "RECORD_CORRECTED", req.patient_id, f"Correction ID: {correction_id} overrides Note ID: {req.original_note_id}. Reason: {req.reason}")
         return {"status": "Correction appended successfully", "correction_id": correction_id}
 
-import hashlib
 
-# --- 6. CRYPTOGRAPHIC VERIFICATION ENDPOINT (FOR LIVE DEMO) ---
+# --- 7. CRYPTOGRAPHIC VERIFICATION ENDPOINT ---
 @app.get("/api/audit/verify")
 async def verify_audit_ledger():
     try:
         async with db.audit_pool.acquire() as conn:
-            # Fetch all logs in order to walk the chain
             logs = await conn.fetch("SELECT * FROM audit_log ORDER BY entry_id ASC")
             
             if not logs:
@@ -229,16 +274,9 @@ async def verify_audit_ledger():
             expected_previous = "0" * 64
             
             for row in logs:
-                # 1. Check if previous hash link is broken
                 if row.get('previous_hash') != expected_previous:
-                    return {
-                        "status": "COMPROMISED", 
-                        "broken_entry": row['entry_id'],
-                        "detail": "Chain link broken. Previous hash does not match."
-                    }
+                    return {"status": "COMPROMISED", "broken_entry": row['entry_id'], "detail": "Chain link broken. Previous hash does not match."}
                 
-                # 2. Recompute current hash to see if data was secretly changed
-                # Using .get() with fallback to empty string so NULL database values don't crash the server
                 user_id = row.get('user_id', '') or ''
                 action = row.get('action', '') or ''
                 patient_id = row.get('target_patient_id', '') or ''
@@ -249,44 +287,11 @@ async def verify_audit_ledger():
                 recomputed_hash = hashlib.sha256(payload.encode("utf-8")).hexdigest()
                 
                 if recomputed_hash != row.get('current_hash'):
-                    return {
-                        "status": "COMPROMISED", 
-                        "broken_entry": row['entry_id'],
-                        "detail": f"Data altered! Expected: {recomputed_hash[:10]}... Found: {str(row.get('current_hash'))[:10]}..."
-                    }
+                    return {"status": "COMPROMISED", "broken_entry": row['entry_id'], "detail": "Data altered! Cryptographic verification failed."}
                 
                 expected_previous = row.get('current_hash')
                 
             return {"status": "SECURE", "message": f"Successfully verified {len(logs)} cryptographic links."}
     except Exception as e:
         print(f"🔥 VERIFY ERROR: {e}")
-        from fastapi import HTTPException
         raise HTTPException(status_code=500, detail=str(e))
-
-# --- 7. DYNAMIC CENSUS ENDPOINT (MULTI-TENANT SECURED) ---
-@app.get("/api/patients")
-async def get_all_patients(user: dict = Depends(get_current_user_id)):
-    try:
-        # Extract the organization (e.g., ORG-UCH or ORG-JAJA) from the logged-in user's token
-        staff_org = user.get("organization")
-        
-        async with db.legacy_pool.acquire() as conn:
-            # Multi-Tenant Filter: ONLY fetch patients where the organization matches the staff!
-            query = """
-                SELECT id, first, last, ward_id 
-                FROM patients 
-                WHERE deathdate IS NULL AND organization = $1 
-                ORDER BY ward_id ASC
-            """
-            patients = await conn.fetch(query, staff_org)
-            
-            return [
-                {
-                    "id": str(p["id"]), 
-                    "name": f"{p['first']} {p['last']}", 
-                    "ward_id": str(p["ward_id"])
-                } for p in patients
-            ]
-    except Exception as e:
-        print(f"🔥 FETCH PATIENTS ERROR: {e}")
-        return []

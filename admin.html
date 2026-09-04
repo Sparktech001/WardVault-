@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WardVault | SIEM Audit Ledger</title>
+    <title>WardVault | SIEM & CPO Audit Command Center</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
         [x-cloak] { display: none !important; }
-        body { background-color: #020617; } /* Deep clinical slate */
+        body { background-color: #020617; }
         @keyframes flash {
             0%, 100% { background-color: rgba(159, 18, 57, 0.2); }
             50% { background-color: rgba(159, 18, 57, 0.8); }
@@ -16,20 +16,20 @@
         .bg-flash { animation: flash 1.5s infinite; }
     </style>
 </head>
-<body class="text-slate-200 font-sans antialiased min-h-screen p-6" x-data="logViewer()" x-init="fetchLogs()">
+<body class="text-slate-200 font-sans antialiased min-h-screen p-6" x-data="cpoDashboard()" x-init="initDashboard()">
 
-    <div class="max-w-6xl mx-auto space-y-6">
-        
-        <!-- 🚨 VERIFICATION ALERT BANNERS (HIDDEN UNTIL BUTTON IS CLICKED) 🚨 -->
-        <div x-show="verifyStatus === 'SECURE'" x-cloak class="bg-emerald-950/80 border border-emerald-500 rounded-xl p-4 flex items-center shadow-lg shadow-emerald-900/20 transition-all">
+    <div class="max-w-7xl mx-auto space-y-6">
+
+        <!-- 🚨 INTEGRITY ALERT BANNERS -->
+        <div x-show="verifyStatus === 'SECURE'" x-cloak class="bg-emerald-950/80 border border-emerald-500 rounded-xl p-4 flex items-center shadow-lg transition-all">
             <span class="text-emerald-400 text-2xl mr-4">✅</span>
             <div>
-                <h3 class="text-emerald-400 font-bold tracking-wider uppercase text-sm">Ledger Verified</h3>
+                <h3 class="text-emerald-400 font-bold tracking-wider uppercase text-sm">Ledger Cryptographically Verified</h3>
                 <p class="text-emerald-200/80 text-xs font-mono" x-text="verifyMessage"></p>
             </div>
         </div>
 
-        <div x-show="verifyStatus === 'COMPROMISED'" x-cloak class="bg-flash border-2 border-rose-500 rounded-xl p-6 flex items-center shadow-2xl shadow-rose-900/50 transition-all">
+        <div x-show="verifyStatus === 'COMPROMISED'" x-cloak class="bg-flash border-2 border-rose-500 rounded-xl p-6 flex items-center shadow-2xl transition-all">
             <span class="text-rose-400 text-4xl mr-6 animate-pulse">🚨</span>
             <div>
                 <h3 class="text-white font-black tracking-widest uppercase text-xl mb-1">CRITICAL INTEGRITY FAILURE</h3>
@@ -38,110 +38,223 @@
             </div>
         </div>
 
-        <!-- Admin Header -->
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex justify-between items-center shadow-lg">
+        <!-- Dashboard Header & Navigation -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-wrap justify-between items-center gap-4 shadow-lg">
             <div class="flex items-center space-x-4">
                 <div class="h-10 w-10 rounded-lg bg-emerald-950 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
                     🛡️
                 </div>
                 <div>
-                    <h1 class="text-base font-bold text-white tracking-wide">Chief Privacy Officer (CPO) Dashboard</h1>
-                    <p class="text-xs text-slate-400 font-mono">Immutable Cryptographic Audit Ledger</p>
+                    <h1 class="text-base font-bold text-white tracking-wide">Chief Privacy Officer (CPO) SIEM Dashboard</h1>
+                    <p class="text-xs text-slate-400 font-mono">Immutable Cryptographic Audit Ledger & Clinical Notes Inspector</p>
                 </div>
             </div>
-            
-            <div class="flex space-x-3">
-                <!-- THE LIVE DEMO BUTTON -->
-                <button @click="verifyLedger()" class="px-4 py-2 bg-indigo-900 hover:bg-indigo-800 text-indigo-200 text-xs font-bold uppercase tracking-wider rounded-lg transition border border-indigo-700 shadow-lg shadow-indigo-900/20">
+
+            <div class="flex flex-wrap items-center gap-3">
+                <button @click="verifyLedger()" class="px-4 py-2 bg-indigo-900 hover:bg-indigo-800 text-indigo-200 text-xs font-bold uppercase tracking-wider rounded-lg transition border border-indigo-700 shadow-lg">
                     🔍 Scan Ledger Integrity
                 </button>
-                <button @click="fetchLogs()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg transition border border-slate-700 flex items-center">
+                <button @click="fetchAllData()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg transition border border-slate-700 flex items-center">
                     <span class="mr-2" :class="loading ? 'animate-spin' : ''">↻</span> Refresh Data
                 </button>
             </div>
         </div>
 
-        <!-- Log Table -->
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-slate-950 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-bold">
-                            <th class="px-6 py-4">Timestamp</th>
-                            <th class="px-6 py-4">Provider (Actor)</th>
-                            <th class="px-6 py-4">Patient (Target)</th>
-                            <th class="px-6 py-4">Security Action</th>
-                            <th class="px-6 py-4">SHA-256 Audit Hash</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-800/60">
-                        
-                        <template x-if="loading">
-                            <tr>
-                                <td colspan="5" class="px-6 py-8 text-center text-slate-500 text-sm">Loading secure logs...</td>
-                            </tr>
-                        </template>
-
-                        <template x-if="!loading && logs.length === 0">
-                            <tr>
-                                <td colspan="5" class="px-6 py-8 text-center text-slate-500 text-sm">No audit logs found in the ledger.</td>
-                            </tr>
-                        </template>
-
-                        <template x-for="log in logs" :key="log.current_hash">
-                            <!-- Highlights the row red if it matches the broken entry from the API -->
-                            <tr class="hover:bg-slate-800/30 transition text-xs font-mono" :class="brokenEntry == log.timestamp ? 'bg-rose-950/40 border-l-2 border-rose-500' : ''">
-                                <td class="px-6 py-4 text-slate-400 whitespace-nowrap" x-text="formatDate(log.timestamp)"></td>
-                                <td class="px-6 py-4 text-cyan-400 font-semibold" x-text="log.provider_id"></td>
-                                <td class="px-6 py-4 text-slate-300" x-text="log.patient_id"></td>
-                                <td class="px-6 py-4">
-                                    <span class="px-2 py-1 rounded text-[10px] font-bold" 
-                                        :class="log.action.includes('OVERRIDE') || log.action.includes('DENIED') ? 'bg-rose-950/60 text-rose-400 border border-rose-800/50' : (log.action.includes('ADMIN') ? 'bg-purple-950/60 text-purple-400 border border-purple-800/50' : 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/50')"
-                                        x-text="log.action">
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4">
-                                    <div class="text-[10px] text-slate-500 truncate max-w-xs" x-text="log.current_hash"></div>
-                                </td>
-                            </tr>
-                        </template>
-                        
-                    </tbody>
-                </table>
+        <!-- Metric Summary Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Audit Events</span>
+                <p class="text-2xl font-black text-white mt-1 font-mono" x-text="logs.length"></p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm">
+                <span class="text-[10px] font-bold text-rose-400 uppercase tracking-wider">Security Denials / Blocks</span>
+                <p class="text-2xl font-black text-rose-400 mt-1 font-mono" x-text="logs.filter(l => l.action.includes('DENIED') || l.action.includes('VIOLATION')).length"></p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm">
+                <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Emergency Overrides</span>
+                <p class="text-2xl font-black text-amber-400 mt-1 font-mono" x-text="logs.filter(l => l.action.includes('OVERRIDE')).length"></p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm">
+                <span class="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Clinical Notes Recorded</span>
+                <p class="text-2xl font-black text-blue-400 mt-1 font-mono" x-text="clinicalNotes.length"></p>
             </div>
         </div>
+
+        <!-- View Tabs Selector -->
+        <div class="flex space-x-2 border-b border-slate-800 pb-2">
+            <button @click="activeTab = 'audit'" class="px-4 py-2 rounded-xl text-xs font-bold transition" :class="activeTab === 'audit' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-900 text-slate-400 hover:text-white'">
+                🔒 SIEM Audit Ledger Logs
+            </button>
+            <button @click="activeTab = 'notes'" class="px-4 py-2 rounded-xl text-xs font-bold transition" :class="activeTab === 'notes' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-900 text-slate-400 hover:text-white'">
+                📝 Clinical Notes & Corrections Inspector
+            </button>
+        </div>
+
+        <!-- TAB 1: AUDIT LEDGER TABLE -->
+        <div class="space-y-4" x-show="activeTab === 'audit'" x-cloak>
+            <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-900/50 p-3 rounded-xl border border-slate-800">
+                <div class="flex items-center space-x-2 text-xs">
+                    <span class="text-slate-400 font-bold">Filter Action:</span>
+                    <select x-model="filterAction" class="bg-slate-950 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-lg outline-none font-mono">
+                        <option value="">All Actions</option>
+                        <option value="GRANTED">Access Granted</option>
+                        <option value="DENIED">Access Denied</option>
+                        <option value="OVERRIDE">Emergency Overrides</option>
+                        <option value="VIOLATION">Security Violations</option>
+                    </select>
+                </div>
+                <div class="text-xs text-slate-400 font-mono" x-text="'Showing ' + filteredLogs.length + ' of ' + logs.length + ' entries'"></div>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-950 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-bold">
+                                <th class="px-6 py-4">Timestamp</th>
+                                <th class="px-6 py-4">Provider (Actor)</th>
+                                <th class="px-6 py-4">Patient (Target)</th>
+                                <th class="px-6 py-4">Security Action</th>
+                                <th class="px-6 py-4">SHA-256 Audit Hash</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800/60">
+                            <template x-if="loading">
+                                <tr>
+                                    <td colspan="5" class="px-6 py-8 text-center text-slate-500 text-sm">Loading audit logs...</td>
+                                </tr>
+                            </template>
+                            <template x-if="!loading && filteredLogs.length === 0">
+                                <tr>
+                                    <td colspan="5" class="px-6 py-8 text-center text-slate-500 text-sm">No matching audit logs found.</td>
+                                </tr>
+                            </template>
+                            <template x-for="log in filteredLogs" :key="log.current_hash">
+                                <tr class="hover:bg-slate-800/30 transition text-xs font-mono" :class="brokenEntry == log.timestamp ? 'bg-rose-950/40 border-l-2 border-rose-500' : ''">
+                                    <td class="px-6 py-4 text-slate-400 whitespace-nowrap" x-text="formatDate(log.timestamp)"></td>
+                                    <td class="px-6 py-4 text-cyan-400 font-semibold" x-text="log.provider_id"></td>
+                                    <td class="px-6 py-4 text-slate-300" x-text="log.patient_id"></td>
+                                    <td class="px-6 py-4">
+                                        <span class="px-2 py-1 rounded text-[10px] font-bold" 
+                                            :class="log.action.includes('OVERRIDE') || log.action.includes('DENIED') || log.action.includes('VIOLATION') ? 'bg-rose-950/60 text-rose-400 border border-rose-800/50' : 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/50'"
+                                            x-text="log.action">
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="text-[10px] text-slate-500 truncate max-w-xs" x-text="log.current_hash"></div>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: CLINICAL NOTES & CORRECTIONS INSPECTOR -->
+        <div class="space-y-4" x-show="activeTab === 'notes'" x-cloak>
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                <div class="p-4 bg-slate-950 border-b border-slate-800 flex justify-between items-center">
+                    <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Immutable Hospital Clinical Notes Ledger</h3>
+                    <span class="text-[10px] text-slate-400 font-mono" x-text="clinicalNotes.length + ' Total Records'"></span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-950/50 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-bold">
+                                <th class="px-5 py-3">Note ID</th>
+                                <th class="px-5 py-3">Patient ID</th>
+                                <th class="px-5 py-3">Provider ID</th>
+                                <th class="px-5 py-3">Clinical Note Text</th>
+                                <th class="px-5 py-3">Correction / Supersede Status</th>
+                                <th class="px-5 py-3">Timestamp</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800/60 text-xs font-mono">
+                            <template x-if="clinicalNotes.length === 0">
+                                <tr>
+                                    <td colspan="6" class="px-6 py-8 text-center text-slate-500">No clinical notes recorded in database.</td>
+                                </tr>
+                            </template>
+                            <template x-for="note in clinicalNotes" :key="note.id">
+                                <tr class="hover:bg-slate-800/30 transition">
+                                    <td class="px-5 py-4 text-emerald-400 font-bold" x-text="'#' + note.id"></td>
+                                    <td class="px-5 py-4 text-slate-300" x-text="note.patient_id"></td>
+                                    <td class="px-5 py-4 text-cyan-400" x-text="note.provider_id"></td>
+                                    <td class="px-5 py-4 text-slate-200 max-w-md">
+                                        <p x-text="note.note_text"></p>
+                                    </td>
+                                    <td class="px-5 py-4">
+                                        <template x-if="note.supersedes_note_id">
+                                            <span class="px-2 py-1 rounded text-[10px] font-bold bg-amber-950/60 text-amber-400 border border-amber-700/50 block">
+                                                Overrides Note #<span x-text="note.supersedes_note_id"></span><br>
+                                                <span class="text-[9px] font-normal text-amber-200" x-text="'Reason: ' + note.correction_reason"></span>
+                                            </span>
+                                        </template>
+                                        <template x-if="!note.supersedes_note_id">
+                                            <span class="text-slate-500 text-[10px]">Original Record</span>
+                                        </template>
+                                    </td>
+                                    <td class="px-5 py-4 text-slate-400 whitespace-nowrap" x-text="formatDate(note.timestamp)"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script>
-        function logViewer() {
+        function cpoDashboard() {
             return {
+                activeTab: 'audit',
                 logs: [],
+                clinicalNotes: [],
                 loading: false,
-                verifyStatus: null, // 'SECURE' or 'COMPROMISED'
+                verifyStatus: null,
                 verifyMessage: '',
                 brokenEntry: null,
-                
-                async fetchLogs() {
-                    this.loading = true;
-                    try {
-                        let res = await fetch('http://127.0.0.1:8000/api/audit-logs');
-                        if (res.ok) {
-                            this.logs = await res.json();
-                        }
-                    } catch (err) {
-                        console.error("Failed to fetch logs", err);
-                    } finally {
-                        this.loading = false;
-                    }
+                filterAction: '',
+
+                get filteredLogs() {
+                    if (!this.filterAction) return this.logs;
+                    return this.logs.filter(l => l.action.toUpperCase().includes(this.filterAction.toUpperCase()));
                 },
 
-                // NEW FUNCTION: Calls the verification API
+                async initDashboard() {
+                    await this.fetchAllData();
+                },
+
+                async fetchAllData() {
+                    this.loading = true;
+                    await Promise.all([
+                        this.fetchLogs(),
+                        this.fetchClinicalNotes()
+                    ]);
+                    this.loading = false;
+                },
+
+                async fetchLogs() {
+                    try {
+                        let res = await fetch('http://127.0.0.1:8000/api/audit-logs');
+                        if (res.ok) this.logs = await res.json();
+                    } catch (err) { console.error("Failed to fetch logs", err); }
+                },
+
+                async fetchClinicalNotes() {
+                    try {
+                        let res = await fetch('http://127.0.0.1:8000/api/admin/clinical-notes');
+                        if (res.ok) this.clinicalNotes = await res.json();
+                    } catch (err) { console.error("Failed to fetch clinical notes", err); }
+                },
+
                 async verifyLedger() {
                     this.verifyStatus = null;
                     try {
                         let res = await fetch('http://127.0.0.1:8000/api/audit/verify');
                         let data = await res.json();
-                        
                         this.verifyStatus = data.status;
                         if (data.status === 'COMPROMISED') {
                             this.verifyMessage = data.detail;
@@ -149,24 +262,18 @@
                         } else {
                             this.verifyMessage = data.message;
                             this.brokenEntry = null;
-                            // Hide the success message after 5 seconds
                             setTimeout(() => { this.verifyStatus = null; }, 5000);
                         }
-                    } catch (err) {
-                        alert("Verification check failed to reach server.");
-                    }
+                    } catch (err) { alert("Verification check failed."); }
                 },
 
-                // The crash-proof date formatter
                 formatDate(dateString) {
                     if (!dateString || dateString === "N/A") return 'N/A';
                     try {
                         const date = new Date(dateString);
                         if (isNaN(date.getTime())) return dateString; 
                         return date.toLocaleString('en-GB', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                    } catch (e) {
-                        return dateString;
-                    }
+                    } catch (e) { return dateString; }
                 }
             }
         }

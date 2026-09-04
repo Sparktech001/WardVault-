@@ -16,13 +16,7 @@
                         mono: ['JetBrains Mono', 'Consolas', 'monospace'],
                     },
                     colors: {
-                        clinical: {
-                            50: '#f8fafc',
-                            100: '#f1f5f9',
-                            800: '#1e293b',
-                            900: '#0f172a',
-                            950: '#020617',
-                        }
+                        clinical: { 50: '#f8fafc', 100: '#f1f5f9', 800: '#1e293b', 900: '#0f172a', 950: '#020617' }
                     }
                 }
             }
@@ -30,19 +24,47 @@
     </script>
     <style>
         [x-cloak] { display: none !important; }
+        body { transition: background-color 0.5s ease; }
+        .bg-downtime { background-color: #fffbeb !important; }
         @keyframes pulse-slow {
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.95; transform: scale(0.995); }
         }
-        .emergency-pulse {
-            animation: pulse-slow 2s infinite ease-in-out;
-        }
+        .emergency-pulse { animation: pulse-slow 2s infinite ease-in-out; }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex items-center justify-center p-4 selection:bg-blue-500 selection:text-white" x-data="wardVault()">
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col items-center justify-center p-4 selection:bg-blue-500 selection:text-white" :class="isOffline ? 'bg-downtime' : ''" x-data="wardVault()">
+
+    <!-- GLOBAL ALERT BANNERS -->
+    <div class="fixed top-0 left-0 right-0 z-[60] flex flex-col items-center pt-2 space-y-2 pointer-events-none">
+        
+        <!-- Abuse Detection Alert -->
+        <div x-show="securityAlert" x-cloak x-transition class="bg-rose-600 text-white px-6 py-3 rounded-xl shadow-2xl border-b-4 border-rose-800 font-bold flex items-center space-x-3 pointer-events-auto">
+            <span class="text-xl">🚨</span>
+            <span>SECURITY ALERT: Suspicious Activity Detected. Unauthorized scope access threshold exceeded.</span>
+            <button @click="resetSecurity()" class="ml-4 text-rose-200 hover:text-white underline text-xs">Acknowledge</button>
+        </div>
+
+        <!-- LIVE Hardware Battery Alerts -->
+        <div x-show="batteryState === 'running'" x-cloak x-transition class="bg-amber-500 text-amber-950 px-6 py-2 rounded-xl shadow-xl font-bold flex items-center space-x-3">
+            <span>⚡ EXTERNAL POWER LOST: Running on Battery (<span x-text="batteryLevelPct"></span>%)</span>
+        </div>
+        <div x-show="batteryState === 'low'" x-cloak x-transition class="bg-red-600 text-white px-6 py-3 rounded-xl shadow-2xl border-b-4 border-red-800 font-bold flex items-center space-x-3">
+            <span class="text-xl">🔋</span>
+            <span>CRITICAL: Battery Low (<span x-text="batteryLevelPct"></span>%). Connect backup power or follow hospital downtime procedure.</span>
+        </div>
+
+        <!-- Auto-Sync Feedback -->
+        <div x-show="syncing" x-cloak class="bg-blue-600 text-white px-6 py-2 rounded-xl shadow-md font-bold text-xs flex items-center pointer-events-auto transition-all">
+            <span class="animate-spin mr-2">↻</span> Synchronizing offline data...
+        </div>
+        <div x-show="syncComplete" x-cloak class="bg-emerald-500 text-white px-6 py-2 rounded-xl shadow-md font-bold text-xs flex items-center transition-all">
+            ✓ Synced to Central Ledger
+        </div>
+    </div>
 
     <!-- LOGIN SCREEN -->
-    <div class="max-w-md w-full bg-white border border-slate-200 shadow-xl rounded-2xl p-8" x-show="!token" x-transition.opacity>
+    <div class="max-w-md w-full bg-white border border-slate-200 shadow-xl rounded-2xl p-8 mt-10" x-show="!token" x-transition.opacity>
         <div class="flex items-center space-x-3 mb-6 pb-6 border-b border-slate-100">
             <div class="h-11 w-11 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
                 <template x-if="!username">
@@ -53,8 +75,8 @@
                 </template>
             </div>
             <div>
-                <h2 class="text-lg font-bold text-slate-900 tracking-tight" x-text="username ? 'Terminal Locked' : 'WardVault EHR'"></h2>
-                <p class="text-xs text-slate-500 font-medium" x-text="username ? 'Enter passphrase to resume shift' : 'Hospital ABAC & Emergency Gateway'"></p>
+               <h2 class="text-lg font-bold text-slate-900 tracking-tight">WardVault EHR</h2>
+               <p class="text-xs text-slate-500 font-medium">Hospital ABAC & Emergency Gateway</p>
             </div>
         </div>
 
@@ -67,19 +89,19 @@
 
         <form @submit.prevent="login" class="space-y-4">
             <div>
-                <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Clinician / Staff ID</label>
+                <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Provider ID</label>
                 <input type="text" x-model="username" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-200 outline-none transition" placeholder="e.g. UCH/26/EME/2980" required>
             </div>
             <div>
                 <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Secure Passphrase</label>
                 <input type="password" x-ref="passInput" x-model="password" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-200 outline-none transition" required>
             </div>
-            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition shadow-sm" x-text="loading ? 'Authenticating...' : (username ? 'Unlock Session' : 'Sign In to Ward')"></button>
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition shadow-sm" x-text="loading ? 'Authenticating...' : 'Sign In to Ward'"></button>
         </form>
     </div>
 
     <!-- MAIN CLINICAL DASHBOARD -->
-    <div class="max-w-4xl w-full mx-auto space-y-4" x-show="token" x-cloak x-transition.opacity>
+    <div class="max-w-4xl w-full mx-auto space-y-4 mt-10" x-show="token && !securityAlert" x-cloak x-transition.opacity>
         
         <!-- HEADER -->
         <div class="bg-white border border-slate-200 shadow-sm rounded-2xl p-4 flex flex-wrap justify-between items-center gap-3">
@@ -89,10 +111,14 @@
                 </div>
                 <div>
                     <div class="flex items-center space-x-2">
-                        <h1 class="text-sm font-bold text-slate-900">General Hospital EHR System</h1>
-                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">Gateway Online</span>
+                        <h1 class="text-sm font-bold text-slate-900" x-text="orgName"></h1>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors flex items-center"
+                              :class="isOffline ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-emerald-100 text-emerald-700 border-emerald-200'">
+                              <span x-show="isOffline" class="w-2 h-2 rounded-full bg-amber-500 mr-1.5 animate-pulse"></span>
+                              <span x-text="isOffline ? 'Offline Mode (Cached)' : 'Gateway Online'"></span>
+                        </span>
                     </div>
-                    <p class="text-xs text-slate-500 font-medium">Active Staff Session: <strong class="text-slate-700" x-text="role"></strong></p>
+                    <p class="text-xs text-slate-500 font-medium">Active Staff Session: <strong class="text-slate-700" x-text="role"></strong> (<span x-text="providerId"></span>)</p>
                 </div>
             </div>
             <button @click="logout" class="text-xs font-bold text-slate-500 hover:text-rose-600 border border-slate-200 hover:border-rose-200 hover:bg-rose-50 bg-white px-3.5 py-1.5 rounded-xl transition shadow-sm">
@@ -101,8 +127,7 @@
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            
-            <!-- LEFT COLUMN: Patient Chart & Append Notes -->
+            <!-- LEFT COLUMN: Gateway Form & Patient Chart -->
             <div class="lg:col-span-7 bg-white border border-slate-200 shadow-sm rounded-2xl p-6 flex flex-col justify-between">
                 <div>
                     <div class="flex items-center justify-between mb-5">
@@ -114,19 +139,41 @@
                     </div>
 
                     <form @submit.prevent="requestAccess(false)" class="space-y-4">
+                        
+                        <!-- WARD CENSUS DROPDOWN (Auto-fills ID and auto-fills/locks ward if UCH) -->
+                        <div x-show="patients.length > 0 && !isOffline" x-cloak>
+                            <label class="block text-xs font-bold text-slate-600 mb-1.5 flex justify-between">
+                                <span>Active Ward Census</span>
+                                <span class="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full" x-text="patients.length + ' Patients'"></span>
+                            </label>
+                            <select @change="
+                                patientId = $event.target.value; 
+                                let selectedPatient = patients.find(p => p.id === patientId);
+                                if(selectedPatient) wardId = selectedPatient.ward_id;
+                            " class="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm font-mono focus:border-blue-500 focus:bg-white outline-none transition cursor-pointer">
+                                <option value="" disabled selected>-- Select a patient to auto-fill ID & Ward --</option>
+                                <template x-for="p in patients" :key="p.id">
+                                    <option :value="p.id" x-text="p.name + ' (Ward: ' + p.ward_id + ')'"></option>
+                                </template>
+                            </select>
+                        </div>
+
                         <div>
-                            <label class="block text-xs font-bold text-slate-600 mb-1.5">Patient Record ID / UUID</label>
+                            <label class="block text-xs font-bold text-slate-600 mb-1.5">Patient Record ID (Manual Entry)</label>
                             <input type="text" x-model="patientId" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm font-mono focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition" placeholder="e.g. 250727" required>
                         </div>
-                        <div>
+                        
+                        <!-- Requesting Ward Unit (Hidden for JAJA since they don't use wards, auto-disables if selected from UCH dropdown) -->
+                        <div x-show="!org.includes('JAJA')" x-cloak>
                             <label class="block text-xs font-bold text-slate-600 mb-1.5">Requesting Ward Unit</label>
-                            <input type="text" x-model="wardId" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm font-mono focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition" placeholder="e.g. uch-icu" required>
+                            <input type="text" x-model="wardId" :disabled="patients.some(p => p.id === patientId)" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm font-mono focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition disabled:bg-slate-200 disabled:text-slate-500" placeholder="e.g. uch-icu">
                         </div>
+
                         <button type="submit" class="w-full font-bold py-2.5 rounded-xl text-xs uppercase tracking-wider transition bg-slate-800 hover:bg-slate-700 text-white shadow-md" x-text="loading ? 'Verifying Authorization...' : 'Fetch Patient Record'"></button>
                     </form>
                 </div>
 
-                <!-- PATIENT CHART PAYLOAD -->
+                <!-- PATIENT CHART (Pulls actual first/last name and gender from Postgres) -->
                 <div x-show="accessResult" x-cloak class="mt-6 pt-5 border-t border-slate-100">
                     <div class="bg-slate-50 border border-emerald-200 rounded-xl p-4 space-y-3">
                         <div class="flex justify-between items-center pb-2 border-b border-slate-200">
@@ -135,33 +182,21 @@
                         </div>
                         
                         <div class="grid grid-cols-2 gap-3 text-xs font-mono bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-                            <div><span class="text-slate-400 font-bold block text-[10px] tracking-wide">PATIENT NAME</span><strong class="text-slate-800 text-sm" x-text="accessResult?.patient?.name || 'N/A'"></strong></div>
-                            <div><span class="text-slate-400 font-bold block text-[10px] tracking-wide">GENDER / AGE</span><strong class="text-slate-800" x-text="(accessResult?.patient?.gender || 'N/A') + ' / ' + (accessResult?.patient?.age || '34')"></strong></div>
-                            <div><span class="text-slate-400 font-bold block text-[10px] tracking-wide">FACILITY UNIT</span><strong class="text-blue-600" x-text="accessResult?.patient?.organization || 'ORG-UCH'"></strong></div>
-                            <div><span class="text-slate-400 font-bold block text-[10px] tracking-wide">ASSIGNED WARD</span><strong class="text-blue-600" x-text="accessResult?.patient?.ward_id || wardId"></strong></div>
-                        </div>
-
-                        <div class="grid grid-cols-3 gap-2 text-center text-xs font-mono">
-                            <div class="bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
-                                <span class="text-slate-400 font-bold block text-[9px] tracking-wide">BLOOD PRESSURE</span>
-                                <strong class="text-emerald-600 text-sm block mt-0.5">120/80 mmHg</strong>
+                            <div>
+                                <span class="text-slate-400 font-bold block text-[10px] tracking-wide">PATIENT NAME</span>
+                                <strong class="text-slate-800 text-sm" x-text="(accessResult?.patient?.first || '') + ' ' + (accessResult?.patient?.last || 'Unknown')"></strong>
                             </div>
-                            <div class="bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
-                                <span class="text-slate-400 font-bold block text-[9px] tracking-wide">HEART RATE</span>
-                                <strong class="text-blue-600 text-sm block mt-0.5">75 bpm</strong>
+                            <div>
+                                <span class="text-slate-400 font-bold block text-[10px] tracking-wide">GENDER</span>
+                                <strong class="text-slate-800" x-text="accessResult?.patient?.gender || 'N/A'"></strong>
                             </div>
-                            <div class="bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
-                                <span class="text-slate-400 font-bold block text-[9px] tracking-wide">O2 SATURATION</span>
-                                <strong class="text-emerald-600 text-sm block mt-0.5">98%</strong>
+                            <div>
+                                <span class="text-slate-400 font-bold block text-[10px] tracking-wide">FACILITY UNIT</span>
+                                <strong class="text-blue-600" x-text="accessResult?.patient?.organization || 'ORG-UCH'"></strong>
                             </div>
-                        </div>
-
-                        <div class="space-y-2 text-xs font-mono bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-                            <div><span class="text-slate-400 font-bold block text-[10px] tracking-wide">PRIMARY DIAGNOSIS / CONDITION</span><strong class="text-slate-700">Acute Stabilization Required / Observation</strong></div>
-                            <div><span class="text-slate-400 font-bold block text-[10px] tracking-wide">ACTIVE MEDICATIONS</span><strong class="text-slate-700">Saline IV drip, Analgesics as needed</strong></div>
-                            <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
-                                <div><span class="text-slate-400 font-bold block text-[9px] tracking-wide">BLOOD GROUP</span><strong class="text-rose-600">O-Positive (O+)</strong></div>
-                                <div><span class="text-slate-400 font-bold block text-[9px] tracking-wide">KNOWN ALLERGIES</span><strong class="text-amber-600">Penicillin, Latex</strong></div>
+                            <div>
+                                <span class="text-slate-400 font-bold block text-[10px] tracking-wide">ASSIGNED WARD</span>
+                                <strong class="text-blue-600" x-text="accessResult?.patient?.ward_id || wardId"></strong>
                             </div>
                         </div>
 
@@ -172,14 +207,22 @@
                                 <span class="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Immutable Record</span>
                             </div>
                             
-                            <div x-show="noteSuccess" class="p-2 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 text-xs text-center font-mono font-bold shadow-sm" x-cloak>
-                                ✓ Note Appended & Cryptographically Hashed
+                            <div class="space-y-3 mb-2 max-h-40 overflow-y-auto">
+                                <template x-for="(note, index) in clinicalNotes" :key="index">
+                                    <div class="p-2 bg-white rounded border border-slate-200 text-xs text-slate-700">
+                                        <p x-text="note.note_text"></p>
+                                        <div class="mt-1 flex justify-between items-center">
+                                            <span class="text-[9px] text-slate-400 font-mono" x-text="new Date(note.timestamp).toLocaleString()"></span>
+                                            <span x-show="note.offline" class="text-[9px] text-amber-600 bg-amber-50 px-1.5 rounded font-bold">Saved locally • Waiting for sync</span>
+                                        </div>
+                                    </div>
+                                </template>
                             </div>
 
-                            <textarea x-model="newNote" rows="2" placeholder="Enter new clinical observation or addendum..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-800 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition resize-none"></textarea>
+                            <textarea x-model="newNote" rows="2" placeholder="Enter new clinical observation..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-800 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition resize-none"></textarea>
                             
-                            <button @click="appendNote" :disabled="!newNote || isSubmittingNote" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg border border-slate-300 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                                <span x-text="isSubmittingNote ? 'Appending...' : 'Save to Immutable Ledger'"></span>
+                            <button @click="appendNote" :disabled="!newNote || isSubmittingNote" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg border border-slate-300 transition shadow-sm disabled:opacity-50">
+                                <span x-text="isSubmittingNote ? 'Appending...' : 'Save Note'"></span>
                             </button>
                         </div>
                     </div>
@@ -204,7 +247,7 @@
                     <div x-show="accessError" x-cloak class="bg-rose-50 border border-rose-200 rounded-xl p-4 text-left space-y-4 shadow-sm">
                         <div>
                             <div class="flex items-center text-rose-700 font-extrabold text-xs mb-1.5 tracking-wide">
-                                <span class="mr-2">⚠️</span> ACCESS REJECTED (ABAC POLICY VIOLATION)
+                                <span class="mr-2">⚠️</span> ACCESS REJECTED (POLICY VIOLATION)
                             </div>
                             <p class="text-xs text-rose-600 font-mono leading-relaxed" x-text="accessError"></p>
                         </div>
@@ -223,7 +266,7 @@
                         <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5 font-mono text-xs shadow-inner">
                             <div>
                                 <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wide">Cryptographic Hash (SHA-256)</span>
-                                <span class="text-[11px] text-blue-600 font-bold break-all leading-relaxed" x-text="accessResult?.audit?.current_hash || accessResult?.audit_hash || '787a9deba783aed400279053024e3fa9...'"></span>
+                                <span class="text-[11px] text-blue-600 font-bold break-all leading-relaxed" x-text="accessResult?.audit?.current_hash || '787a9deba783aed400279053024e3fa9...'"></span>
                             </div>
                             <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200 text-[11px]">
                                 <div>
@@ -241,9 +284,9 @@
                         <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 space-y-3 mt-4 shadow-sm" x-show="isEmergency">
                             <h4 class="text-xs font-extrabold text-amber-700 uppercase tracking-wide">📝 Post-Treatment Rationale (REQUIRED)</h4>
                             <p class="text-[11px] text-amber-700 font-medium leading-relaxed">
-                                You performed an emergency override. Patient care is complete. You <strong class="font-extrabold text-amber-800">cannot lock or log out</strong> of this session until you select your compliance rationale below.
+                                You performed an emergency override. You <strong class="font-extrabold text-amber-800">cannot lock or log out</strong> of this session until you select your compliance rationale below.
                             </p>
-                            <select x-model="reason" class="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-amber-900 text-xs font-semibold focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none shadow-sm cursor-pointer" required>
+                            <select x-model="reason" class="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-amber-900 text-xs font-semibold outline-none shadow-sm cursor-pointer" required>
                                 <option value="" disabled selected>-- Select Authorized Rationale --</option>
                                 <option value="Life-threatening trauma / Code Blue">Life-threatening trauma / Code Blue</option>
                                 <option value="Cross-ward consultation required">Cross-ward consultation required</option>
@@ -253,11 +296,6 @@
                         </div>
                     </div>
                 </div>
-
-                <div class="pt-4 mt-4 border-t border-slate-100 text-[10px] text-slate-400 font-bold flex justify-between tracking-wide uppercase">
-                    <span>Station: Terminal-4</span>
-                    <span>Protocol: HL7-FHIR-Sec</span>
-                </div>
             </div>
         </div>
     </div>
@@ -265,7 +303,6 @@
     <!-- OVERRIDE MODAL -->
     <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-6 z-50" x-show="accessError && showModal" x-cloak x-transition.opacity>
         <div class="bg-white border-4 border-rose-500 shadow-2xl rounded-3xl max-w-3xl w-full p-12 space-y-8 text-center emergency-pulse">
-            
             <div class="w-24 h-24 mx-auto rounded-full bg-rose-50 border-4 border-rose-100 flex items-center justify-center text-rose-500 shadow-inner">
                 <svg class="w-12 h-12 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
             </div>
@@ -295,7 +332,7 @@
             <template x-if="!isDoctor()">
                 <div class="space-y-6">
                     <div class="bg-rose-50 border border-rose-200 p-4 rounded-2xl text-rose-700 text-sm font-mono font-medium text-left shadow-sm">
-                        🔒 <strong>Override Restricted:</strong> Your active credential role (<span class="underline font-bold" x-text="role"></span>) does not have emergency break-glass clearance. Institutional policy strictly restricts emergency overrides to attending physicians (Doctors).
+                        🔒 <strong>Override Restricted:</strong> Your active credential role (<span class="underline font-bold" x-text="role"></span>) does not have emergency break-glass clearance.
                     </div>
                     <button @click="showModal = false" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300 font-bold py-4 rounded-xl text-xs uppercase tracking-wider transition shadow-sm">
                         Dismiss & Return
@@ -305,20 +342,96 @@
         </div>
     </div>
 
+    <!-- HACKATHON DEMO CONTROLS -->
+    <div class="fixed bottom-4 right-4 bg-slate-800 text-white p-4 rounded-xl shadow-2xl border border-slate-700 space-y-3 z-[60] text-xs" x-show="token" x-cloak>
+        <div class="font-bold text-slate-300 uppercase tracking-wider mb-2 border-b border-slate-600 pb-1">Demo Simulator</div>
+        <div class="flex items-center justify-between space-x-4">
+            <span>Network:</span>
+            <button @click="toggleNetwork()" class="px-3 py-1 rounded font-bold transition" :class="isOffline ? 'bg-rose-600' : 'bg-emerald-600'" x-text="isOffline ? 'Wi-Fi OFF' : 'Wi-Fi ON'"></button>
+        </div>
+        <div class="text-[10px] text-slate-400 text-center mt-2 border-t border-slate-700 pt-1">
+            Battery API Hardware Sync: ACTIVE
+        </div>
+    </div>
+
+    <!-- INDEXEDDB HELPER -->
     <script>
+        class WardVaultDB {
+            constructor() { this.dbName = "WardVaultOfflineDB"; this.dbVersion = 1; this.db = null; }
+            async init() {
+                return new Promise((resolve, reject) => {
+                    const req = indexedDB.open(this.dbName, this.dbVersion);
+                    req.onerror = (e) => reject(e.target.error);
+                    req.onsuccess = (e) => { this.db = e.target.result; resolve(this.db); };
+                    req.onupgradeneeded = (e) => {
+                        const db = e.target.result;
+                        if (!db.objectStoreNames.contains("patients")) db.createObjectStore("patients", { keyPath: "id" });
+                        if (!db.objectStoreNames.contains("pending_notes")) db.createObjectStore("pending_notes", { keyPath: "id", autoIncrement: true });
+                    };
+                });
+            }
+            _tx(store, mode, cb) {
+                return new Promise((res, rej) => {
+                    const tx = this.db.transaction(store, mode);
+                    const req = cb(tx.objectStore(store));
+                    req.onsuccess = () => res(req.result);
+                    req.onerror = () => rej(req.error);
+                });
+            }
+            savePatient(p) { return this._tx("patients", "readwrite", s => s.put(p)); }
+            getPatient(id) { return this._tx("patients", "readonly", s => s.get(id)); }
+            saveNote(n) { return this._tx("pending_notes", "readwrite", s => s.add(n)); }
+            getNotes() { return this._tx("pending_notes", "readonly", s => s.getAll()); }
+            clearNotes() { return this._tx("pending_notes", "readwrite", s => s.clear()); }
+        }
+        const localVault = new WardVaultDB();
+
+        // ALPINE APP
         function wardVault() {
             return {
-                token: null, role: '', username: '', password: 'password123', authError: '',
+                token: null, role: '', username: '', password: 'password123', orgName: 'Central Healthcare', providerId: '',
+                org: '', // Tracks organization to handle JAJA layout properly
+                authError: '', accessError: '', loading: false, showModal: false,
                 patientId: '250727', wardId: 'uch-icu', isEmergency: false, reason: '',
-                accessResult: null, accessError: '', loading: false, showModal: false,
+                accessResult: null, patients: [], clinicalNotes: [], newNote: '', isSubmittingNote: false,
                 
-                newNote: '', 
-                isSubmittingNote: false, 
-                noteSuccess: false,
+                // Hackathon & Hardware State
+                failedAttempts: 0, securityAlert: false,
+                isOffline: !navigator.onLine, syncing: false, syncComplete: false,
+                batteryState: 'normal', batteryLevelPct: 100,
+
+                async init() {
+                    // Init IndexedDB Cache
+                    await localVault.init();
+                    
+                    // Offline standard listeners
+                    window.addEventListener('offline', () => { this.isOffline = true; });
+                    window.addEventListener('online', () => { 
+                        this.isOffline = false; 
+                        this.syncPendingData(); 
+                    });
+
+                    // Battery API
+                    if ('getBattery' in navigator) {
+                        navigator.getBattery().then(b => {
+                            this.updateBatteryState(b);
+                            b.addEventListener('chargingchange', () => this.updateBatteryState(b));
+                            b.addEventListener('levelchange', () => this.updateBatteryState(b));
+                        });
+                    }
+                },
+
+                updateBatteryState(battery) {
+                    this.batteryLevelPct = Math.round(battery.level * 100);
+                    if (battery.charging) {
+                        this.batteryState = 'normal';
+                    } else {
+                        this.batteryState = battery.level <= 0.20 ? 'low' : 'running';
+                    }
+                },
 
                 isDoctor() {
-                    const doctorRoles = ['Emergency Medicine', 'Cardiology', 'Neurology', 'Pediatrics', 'Surgery'];
-                    return doctorRoles.includes(this.role);
+                    return ['Emergency Medicine', 'Cardiology', 'Neurology', 'Pediatrics', 'Surgery'].includes(this.role);
                 },
 
                 async login() {
@@ -329,18 +442,53 @@
                         params.append('password', this.password);
                         let res = await fetch('http://127.0.0.1:8000/api/login', { method: 'POST', body: params });
                         if (!res.ok) throw new Error();
+                        
                         let data = await res.json();
                         this.token = data.access_token;
                         let payload = JSON.parse(atob(this.token.split('.')[1]));
+                        
+                        this.providerId = payload.sub;
                         this.role = payload.role;
+                        this.org = payload.org ? payload.org.toUpperCase() : '';
+                        this.orgName = this.org.includes('JAJA') ? 'JAJA Ambulatory Care' : 'University Clinical Hospital (UCH)';
+                        this.wardId = payload.ward_id || '';
+                        
+                        await this.fetchPatients();
                     } catch (err) {
                         this.authError = 'Staff authentication failed. Invalid credentials or unauthorized station.';
                     } finally { this.loading = false; }
                 },
 
+                async fetchPatients() {
+                    if (this.isOffline) return;
+                    try {
+                        let res = await fetch('http://127.0.0.1:8000/api/patients', {
+                            headers: { 'Authorization': `Bearer ${this.token}` }
+                        });
+                        if (res.ok) this.patients = await res.json();
+                    } catch (e) { console.error("Census fetch failed"); }
+                },
+
                 async requestAccess(isOverride = false) {
-                    this.accessError = ''; this.loading = true;
+                    this.accessError = ''; this.loading = true; this.clinicalNotes = [];
                     if (isOverride) { this.isEmergency = true; }
+                    
+                    if (this.isOffline) {
+                        setTimeout(async () => {
+                            let cached = await localVault.getPatient(this.patientId);
+                            if (cached) {
+                                this.accessResult = { patient: cached };
+                                let allPending = await localVault.getNotes();
+                                this.clinicalNotes = allPending.filter(n => n.patient_id === this.patientId);
+                            } else {
+                                this.accessError = "Record not found in offline encrypted cache.";
+                            }
+                            this.showModal = false;
+                            this.loading = false;
+                        }, 300);
+                        return;
+                    }
+
                     try {
                         let res = await fetch('http://127.0.0.1:8000/api/records/access', {
                             method: 'POST',
@@ -353,74 +501,106 @@
                             })
                         });
                         let data = await res.json();
-                        if (!res.ok) throw new Error(data.detail?.message || data.detail || 'Access Denied: ABAC Policy Violation (Ward Mismatch)');
-                        this.accessResult = data;
-                        this.showModal = false;
-                    } catch (err) {
-                        this.accessError = err.message;
+                        if (!res.ok) throw new Error(data.detail?.message || data.detail || 'Access Denied: ABAC Policy Violation');
                         
-                        // SAFEGUARD: Ghost ID block
-                        if (err.message.toLowerCase().includes('not found') || err.message.toLowerCase().includes('404')) {
-                            this.showModal = false;
-                        } else {
-                            const doctorRoles = ['Emergency Medicine', 'Cardiology', 'Neurology', 'Pediatrics', 'Surgery'];
-                            if (doctorRoles.includes(this.role)) {
-                                this.showModal = true;
-                            } else {
-                                this.showModal = false;
-                            }
-                        }
-                    } finally { this.loading = false; }
+                        this.accessResult = data;
+                        await localVault.savePatient(data.patient); // Cache for offline
+                        
+                        this.showModal = false;
+                        this.resetSecurity(); 
+        } catch (err) {
+        // FIX: Ensure we safely grab the error text whether it's a string or object
+        this.accessError = err.message || 'Access Denied: ABAC Policy Violation';
+        this.failedAttempts++;
+        
+        if (this.failedAttempts >= 4) {
+            this.securityAlert = true;
+            this.showModal = false;
+        } else if (this.isDoctor()) {
+            // FIX: Force the modal to open for any doctor facing a policy block
+            this.showModal = true; 
+        } else {
+            this.showModal = false;
+        }
+    } finally { 
+        this.loading = false; 
+    }
+
+                resetSecurity() {
+                    this.securityAlert = false;
+                    this.failedAttempts = 0;
+                    this.accessError = '';
                 },
 
                 async appendNote() {
                     if (!this.newNote.trim()) return;
                     this.isSubmittingNote = true;
                     
+                    if (this.isOffline) {
+                        setTimeout(async () => {
+                            let offlineNote = { patient_id: this.patientId, note_text: this.newNote, timestamp: new Date().toISOString(), offline: true };
+                            await localVault.saveNote(offlineNote);
+                            this.clinicalNotes.push(offlineNote);
+                            this.newNote = '';
+                            this.isSubmittingNote = false;
+                        }, 300);
+                        return;
+                    }
+                    
                     try {
                         let res = await fetch('http://127.0.0.1:8000/api/records/notes', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
-                            body: JSON.stringify({ 
-                                patient_id: this.patientId, 
-                                note_text: this.newNote 
-                            })
+                            body: JSON.stringify({ patient_id: this.patientId, note_text: this.newNote })
                         });
-                        
                         if (res.ok) {
+                            this.clinicalNotes.push({ note_text: this.newNote, timestamp: new Date().toISOString(), offline: false });
                             this.newNote = '';
-                            this.noteSuccess = true;
-                            setTimeout(() => { this.noteSuccess = false; }, 3000);
-                        } else {
-                            alert("Failed to securely append note to the ledger.");
                         }
                     } catch (err) {
-                        console.error("Error saving note:", err);
-                    } finally {
-                        this.isSubmittingNote = false;
-                    }
+                        alert("Failed to append note online.");
+                    } finally { this.isSubmittingNote = false; }
+                },
+
+                toggleNetwork() {
+                    this.isOffline = !this.isOffline;
+                    if (!this.isOffline) this.syncPendingData();
+                },
+
+                async syncPendingData() {
+                    let pendingNotes = await localVault.getNotes();
+                    if (pendingNotes.length === 0) return;
+
+                    this.syncing = true;
+                    setTimeout(async () => {
+                        try {
+                            for (let note of pendingNotes) {
+                                await fetch('http://127.0.0.1:8000/api/records/notes', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                                    body: JSON.stringify({ patient_id: note.patient_id, note_text: note.note_text })
+                                });
+                            }
+                            await localVault.clearNotes();
+                            this.clinicalNotes.forEach(n => n.offline = false);
+                            
+                            this.syncing = false;
+                            this.syncComplete = true;
+                            setTimeout(() => { this.syncComplete = false; }, 3000);
+                        } catch (e) {
+                            this.syncing = false;
+                        }
+                    }, 1500);
                 },
 
                 logout() { 
                     if (this.isEmergency && !this.reason) {
-                        alert("Compliance Interlock Active: You executed an emergency break-glass override. You must select your clinical rationale from the dropdown menu before you can lock or terminate your session.");
+                        alert("Compliance Interlock Active: Select clinical rationale before locking session.");
                         return;
                     }
-                    
-                    this.token = null; 
-                    this.role = ''; 
-                    this.accessResult = null; 
-                    this.isEmergency = false; 
-                    this.reason = ''; 
-                    this.showModal = false;
-                    this.accessError = '';
-                    this.password = '';
-                    
-                    this.$nextTick(() => {
-                        if (this.$refs.passInput) {
-                            this.$refs.passInput.focus();
-                        }
-                    });
+                    this.token = null; this.accessResult = null; this.patients = [];
+                    this.isEmergency = false; this.reason = ''; this.showModal = false;
+                    this.password = ''; this.org = '';
                 }
             }
         }
