@@ -45,6 +45,11 @@ class NoteCorrectionRequest(BaseModel):
     corrected_text: str
     reason: str
 
+# NEW: Model for Brute Force Logging
+class ThreatReportRequest(BaseModel):
+    patient_id: str
+    description: str
+
 @app.get("/health")
 async def health_check():
     return {"status": "online", "system": "WardVault Gateway"}
@@ -106,7 +111,7 @@ async def access_patient_record(
 
         if is_jaja_staff != is_jaja_patient:
             await log_access_event(current_user_id, "CROSS_TENANT_VIOLATION_BLOCKED", req.patient_id, f"Staff org ({provider_org}) attempted to access cross-facility patient ({patient_org})")
-            raise HTTPException(status_code=403, detail="Cross-Tenant Security Violation: Access between JAJA Clinic and UCH Hospital is strictly prohibited.")
+            raise HTTPException(status_code=403, detail="Patient not found in this facility's database.")
 
         # HARD BLOCK FOR NON-CLINICAL STAFF
         if provider_role in ["Billing Clerk", "IT Admin", "Clerk"]:
@@ -170,6 +175,21 @@ async def access_patient_record(
         }
 
 
+# --- NEW: LOG A BRUTE FORCE THREAT ---
+@app.post("/api/audit/threat")
+async def report_security_threat(req: ThreatReportRequest, user: dict = Depends(get_current_user)):
+    audit_entry = await log_access_event(user["sub"], "BRUTE_FORCE_DETECTED", req.patient_id, req.description)
+    return {"status": "Threat logged"}
+
+
+# --- NEW: HARD RESET LEDGER FOR DEMO PREP ---
+@app.post("/api/admin/reset-ledger")
+async def reset_ledger():
+    async with db.audit_pool.acquire() as conn:
+        await conn.execute("TRUNCATE TABLE audit_log RESTART IDENTITY CASCADE")
+    return {"status": "Ledger reset successfully for demo"}
+
+
 # --- 4. DYNAMIC CENSUS ENDPOINT (MULTI-TENANT SECURED) ---
 @app.get("/api/patients")
 async def get_all_patients(user: dict = Depends(get_current_user)):
@@ -199,7 +219,7 @@ async def get_all_patients(user: dict = Depends(get_current_user)):
 @app.get("/api/audit-logs")
 async def get_audit_logs():
     async with db.audit_pool.acquire() as conn:
-        logs = await conn.fetch("SELECT timestamp, user_id, target_patient_id, action, current_hash FROM audit_log ORDER BY timestamp DESC LIMIT 15")
+        logs = await conn.fetch("SELECT timestamp, user_id, target_patient_id, action, current_hash FROM audit_log ORDER BY timestamp DESC LIMIT 1000")
         return [
             {
                 "timestamp": str(l["timestamp"]),

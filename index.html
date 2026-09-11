@@ -140,10 +140,10 @@
 
                     <form @submit.prevent="requestAccess(false)" class="space-y-4">
                         
-                        <!-- WARD CENSUS DROPDOWN (Auto-fills ID and auto-fills/locks ward if UCH) -->
+                        <!-- PATIENT ID CENSUS DROPDOWN -->
                         <div x-show="patients.length > 0 && !isOffline" x-cloak>
                             <label class="block text-xs font-bold text-slate-600 mb-1.5 flex justify-between">
-                                <span>Active Ward Census</span>
+                                <span>Patient ID</span>
                                 <span class="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full" x-text="patients.length + ' Patients'"></span>
                             </label>
                             <select @change="
@@ -153,7 +153,7 @@
                             " class="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm font-mono focus:border-blue-500 focus:bg-white outline-none transition cursor-pointer">
                                 <option value="" disabled selected>-- Select a patient to auto-fill ID & Ward --</option>
                                 <template x-for="p in patients" :key="p.id">
-                                    <option :value="p.id" x-text="p.name + ' (Ward: ' + p.ward_id + ')'"></option>
+                                    <option :value="p.id" x-text="p.name + ' (ID: ' + p.id + ')'"></option>
                                 </template>
                             </select>
                         </div>
@@ -163,7 +163,7 @@
                             <input type="text" x-model="patientId" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm font-mono focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition" placeholder="e.g. 250727" required>
                         </div>
                         
-                        <!-- Requesting Ward Unit (Hidden for JAJA since they don't use wards, auto-disables if selected from UCH dropdown) -->
+                        <!-- Requesting Ward Unit (Hidden for JAJA since they don't use wards) -->
                         <div x-show="!org.includes('JAJA')" x-cloak>
                             <label class="block text-xs font-bold text-slate-600 mb-1.5">Requesting Ward Unit</label>
                             <input type="text" x-model="wardId" :disabled="patients.some(p => p.id === patientId)" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm font-mono focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition disabled:bg-slate-200 disabled:text-slate-500" placeholder="e.g. uch-icu">
@@ -173,7 +173,7 @@
                     </form>
                 </div>
 
-                <!-- PATIENT CHART (Pulls actual first/last name and gender from Postgres) -->
+                <!-- PATIENT CHART -->
                 <div x-show="accessResult" x-cloak class="mt-6 pt-5 border-t border-slate-100">
                     <div class="bg-slate-50 border border-emerald-200 rounded-xl p-4 space-y-3">
                         <div class="flex justify-between items-center pb-2 border-b border-slate-200">
@@ -322,7 +322,7 @@
                         <button @click="requestAccess(true)" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-black py-6 rounded-2xl text-2xl uppercase tracking-widest transition transform active:scale-95 flex items-center justify-center space-x-3 shadow-lg shadow-rose-600/30">
                             <span>🚨</span><span>OVERRIDE</span><span>🚨</span>
                         </button>
-                        <button @click="showModal = false" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300 font-bold py-4 rounded-xl text-xs uppercase tracking-wider transition shadow-sm">
+                        <button @click="cancelOverride()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300 font-bold py-4 rounded-xl text-xs uppercase tracking-wider transition shadow-sm">
                             Cancel & Return
                         </button>
                     </div>
@@ -334,7 +334,7 @@
                     <div class="bg-rose-50 border border-rose-200 p-4 rounded-2xl text-rose-700 text-sm font-mono font-medium text-left shadow-sm">
                         🔒 <strong>Override Restricted:</strong> Your active credential role (<span class="underline font-bold" x-text="role"></span>) does not have emergency break-glass clearance.
                     </div>
-                    <button @click="showModal = false" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300 font-bold py-4 rounded-xl text-xs uppercase tracking-wider transition shadow-sm">
+                    <button @click="cancelOverride()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300 font-bold py-4 rounded-xl text-xs uppercase tracking-wider transition shadow-sm">
                         Dismiss & Return
                     </button>
                 </div>
@@ -350,11 +350,11 @@
             <button @click="toggleNetwork()" class="px-3 py-1 rounded font-bold transition" :class="isOffline ? 'bg-rose-600' : 'bg-emerald-600'" x-text="isOffline ? 'Wi-Fi OFF' : 'Wi-Fi ON'"></button>
         </div>
         <div class="text-[10px] text-slate-400 text-center mt-2 border-t border-slate-700 pt-1">
-            Battery API Hardware Sync: ACTIVE
+            Battery API Hardware Audio Sync: ACTIVE
         </div>
     </div>
 
-    <!-- INDEXEDDB HELPER -->
+    <!-- INDEXEDDB & AUDIO HELPER -->
     <script>
         class WardVaultDB {
             constructor() { this.dbName = "WardVaultOfflineDB"; this.dbVersion = 1; this.db = null; }
@@ -386,37 +386,82 @@
         }
         const localVault = new WardVaultDB();
 
+        // WEB AUDIO API BEEP SYNTHESIZER
+        function playAlertTone(type) {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                if (type === 'unplug') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+                    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.3);
+                } else if (type === 'charging') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); 
+                    osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.15); 
+                    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.35);
+                } else if (type === 'low') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.15);
+                }
+            } catch(e) { console.log("Audio Context requires user interaction first"); }
+        }
+
         // ALPINE APP
         function wardVault() {
             return {
                 token: null, role: '', username: '', password: 'password123', orgName: 'Central Healthcare', providerId: '',
-                org: '', // Tracks organization to handle JAJA layout properly
+                org: '', 
                 authError: '', accessError: '', loading: false, showModal: false,
-                patientId: '250727', wardId: 'uch-icu', isEmergency: false, reason: '',
+                patientId: '', wardId: '', isEmergency: false, reason: '',
                 accessResult: null, patients: [], clinicalNotes: [], newNote: '', isSubmittingNote: false,
                 
                 // Hackathon & Hardware State
                 failedAttempts: 0, securityAlert: false,
                 isOffline: !navigator.onLine, syncing: false, syncComplete: false,
                 batteryState: 'normal', batteryLevelPct: 100,
+                previousChargingState: null,
 
                 async init() {
-                    // Init IndexedDB Cache
                     await localVault.init();
                     
-                    // Offline standard listeners
                     window.addEventListener('offline', () => { this.isOffline = true; });
                     window.addEventListener('online', () => { 
                         this.isOffline = false; 
                         this.syncPendingData(); 
                     });
 
-                    // Battery API
+                    // Battery API with Audio Hardware Hooks
                     if ('getBattery' in navigator) {
                         navigator.getBattery().then(b => {
+                            this.previousChargingState = b.charging;
                             this.updateBatteryState(b);
-                            b.addEventListener('chargingchange', () => this.updateBatteryState(b));
-                            b.addEventListener('levelchange', () => this.updateBatteryState(b));
+                            b.addEventListener('chargingchange', () => {
+                                if (this.previousChargingState && !b.charging) {
+                                    playAlertTone('unplug'); 
+                                } else if (!this.previousChargingState && b.charging) {
+                                    playAlertTone('charging'); 
+                                }
+                                this.previousChargingState = b.charging;
+                                this.updateBatteryState(b);
+                            });
+                            b.addEventListener('levelchange', () => {
+                                if (!b.charging && b.level <= 0.20) {
+                                    playAlertTone('low'); 
+                                }
+                                this.updateBatteryState(b);
+                            });
                         });
                     }
                 },
@@ -432,6 +477,12 @@
 
                 isDoctor() {
                     return ['Emergency Medicine', 'Cardiology', 'Neurology', 'Pediatrics', 'Surgery'].includes(this.role);
+                },
+
+                cancelOverride() {
+                    this.showModal = false;
+                    this.isEmergency = false;
+                    this.reason = '';
                 },
 
                 async login() {
@@ -451,7 +502,11 @@
                         this.role = payload.role;
                         this.org = payload.org ? payload.org.toUpperCase() : '';
                         this.orgName = this.org.includes('JAJA') ? 'JAJA Ambulatory Care' : 'University Clinical Hospital (UCH)';
+                        
+                        this.patientId = ''; 
                         this.wardId = payload.ward_id || '';
+                        this.accessError = '';
+                        this.accessResult = null;
                         
                         await this.fetchPatients();
                     } catch (err) {
@@ -504,27 +559,39 @@
                         if (!res.ok) throw new Error(data.detail?.message || data.detail || 'Access Denied: ABAC Policy Violation');
                         
                         this.accessResult = data;
-                        await localVault.savePatient(data.patient); // Cache for offline
+                        await localVault.savePatient(data.patient);
                         
                         this.showModal = false;
                         this.resetSecurity(); 
-        } catch (err) {
-        // FIX: Ensure we safely grab the error text whether it's a string or object
-        this.accessError = err.message || 'Access Denied: ABAC Policy Violation';
-        this.failedAttempts++;
-        
-        if (this.failedAttempts >= 4) {
-            this.securityAlert = true;
-            this.showModal = false;
-        } else if (this.isDoctor()) {
-            // FIX: Force the modal to open for any doctor facing a policy block
-            this.showModal = true; 
-        } else {
-            this.showModal = false;
-        }
-    } finally { 
-        this.loading = false; 
-    }
+                    } catch (err) {
+                        this.accessError = err.message || 'Access Denied: ABAC Policy Violation';
+                        
+                        if (this.accessError.toLowerCase().includes("not found")) {
+                            this.showModal = false;
+                        } else {
+                            this.failedAttempts++;
+                            
+                            if (this.failedAttempts >= 4) {
+                                this.securityAlert = true;
+                                this.showModal = false;
+                                
+                                // NEW: Ping the backend to log this threat for the CPO Dashboard!
+                                fetch('http://127.0.0.1:8000/api/audit/threat', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                                    body: JSON.stringify({ patient_id: this.patientId, description: "System blocked 4 consecutive unauthorized access attempts." })
+                                }).catch(e => console.log(e));
+                                
+                            } else if (this.isDoctor()) {
+                                this.showModal = true; 
+                            } else {
+                                this.showModal = false;
+                            }
+                        }
+                    } finally { 
+                        this.loading = false; 
+                    }
+                },
 
                 resetSecurity() {
                     this.securityAlert = false;
@@ -598,9 +665,19 @@
                         alert("Compliance Interlock Active: Select clinical rationale before locking session.");
                         return;
                     }
-                    this.token = null; this.accessResult = null; this.patients = [];
-                    this.isEmergency = false; this.reason = ''; this.showModal = false;
-                    this.password = ''; this.org = '';
+                    this.token = null; 
+                    this.accessResult = null; 
+                    this.patients = [];
+                    this.isEmergency = false; 
+                    this.reason = ''; 
+                    this.showModal = false;
+                    this.password = ''; 
+                    this.username = ''; 
+                    this.org = '';
+                    this.patientId = ''; 
+                    this.wardId = ''; 
+                    this.accessError = '';
+                    this.failedAttempts = 0;
                 }
             }
         }

@@ -14,11 +14,32 @@
             50% { background-color: rgba(159, 18, 57, 0.8); }
         }
         .bg-flash { animation: flash 1.5s infinite; }
+        input[type="date"] { color-scheme: dark; }
     </style>
 </head>
 <body class="text-slate-200 font-sans antialiased min-h-screen p-6" x-data="cpoDashboard()" x-init="initDashboard()">
 
     <div class="max-w-7xl mx-auto space-y-6">
+
+        <!-- 🚨 ACTIVE BRUTE FORCE THREAT BANNER -->
+        <div x-show="activeThreats.length > 0" x-cloak class="bg-flash border-2 border-red-600 rounded-xl p-6 flex flex-col justify-center shadow-2xl transition-all">
+            <div class="flex items-center mb-3">
+                <span class="text-red-400 text-4xl mr-4 animate-bounce">⚠️</span>
+                <div>
+                    <h3 class="text-white font-black tracking-widest uppercase text-xl">ACTIVE THREAT DETECTED</h3>
+                    <p class="text-red-200 text-sm font-mono font-bold">Multiple unauthorized access attempts blocked.</p>
+                </div>
+            </div>
+            <div class="bg-red-950/50 p-3 rounded-lg border border-red-800 text-xs font-mono space-y-1">
+                <template x-for="threat in activeThreats" :key="threat.current_hash">
+                    <div class="flex justify-between text-red-300 bg-red-900/30 px-2 py-1 rounded">
+                        <span><strong class="text-red-400">Target:</strong> <span x-text="threat.patient_id"></span></span>
+                        <span><strong class="text-red-400">Attacker ID:</strong> <span x-text="threat.provider_id"></span></span>
+                        <span x-text="formatDate(threat.timestamp)"></span>
+                    </div>
+                </template>
+            </div>
+        </div>
 
         <!-- 🚨 INTEGRITY ALERT BANNERS -->
         <div x-show="verifyStatus === 'SECURE'" x-cloak class="bg-emerald-950/80 border border-emerald-500 rounded-xl p-4 flex items-center shadow-lg transition-all">
@@ -51,6 +72,9 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-3">
+                <button @click="resetDemoLedger()" class="px-3 py-2 bg-rose-950 hover:bg-rose-900 text-rose-300 text-[10px] font-bold uppercase tracking-wider rounded-lg transition border border-rose-800">
+                    Reset Demo Ledger
+                </button>
                 <button @click="verifyLedger()" class="px-4 py-2 bg-indigo-900 hover:bg-indigo-800 text-indigo-200 text-xs font-bold uppercase tracking-wider rounded-lg transition border border-indigo-700 shadow-lg">
                     🔍 Scan Ledger Integrity
                 </button>
@@ -68,7 +92,7 @@
             </div>
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm">
                 <span class="text-[10px] font-bold text-rose-400 uppercase tracking-wider">Security Denials / Blocks</span>
-                <p class="text-2xl font-black text-rose-400 mt-1 font-mono" x-text="logs.filter(l => l.action.includes('DENIED') || l.action.includes('VIOLATION')).length"></p>
+                <p class="text-2xl font-black text-rose-400 mt-1 font-mono" x-text="logs.filter(l => l.action.includes('DENIED') || l.action.includes('VIOLATION') || l.action.includes('BRUTE')).length"></p>
             </div>
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm">
                 <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Emergency Overrides</span>
@@ -92,16 +116,35 @@
 
         <!-- TAB 1: AUDIT LEDGER TABLE -->
         <div class="space-y-4" x-show="activeTab === 'audit'" x-cloak>
+            
+            <!-- FILTER CONTROLS -->
             <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-900/50 p-3 rounded-xl border border-slate-800">
-                <div class="flex items-center space-x-2 text-xs">
-                    <span class="text-slate-400 font-bold">Filter Action:</span>
-                    <select x-model="filterAction" class="bg-slate-950 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-lg outline-none font-mono">
-                        <option value="">All Actions</option>
-                        <option value="GRANTED">Access Granted</option>
-                        <option value="DENIED">Access Denied</option>
-                        <option value="OVERRIDE">Emergency Overrides</option>
-                        <option value="VIOLATION">Security Violations</option>
-                    </select>
+                <div class="flex flex-wrap items-center gap-4 text-xs">
+                    
+                    <!-- Action Filter -->
+                    <div class="flex items-center space-x-2">
+                        <span class="text-slate-400 font-bold">Action:</span>
+                        <select x-model="filterAction" class="bg-slate-950 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-lg outline-none font-mono">
+                            <option value="">All Actions</option>
+                            <option value="GRANTED">Access Granted</option>
+                            <option value="DENIED">Access Denied</option>
+                            <option value="OVERRIDE">Emergency Overrides</option>
+                            <option value="VIOLATION">Security Violations</option>
+                            <option value="DETECTED">Threats Detected</option>
+                        </select>
+                    </div>
+
+                    <!-- Date Filter -->
+                    <div class="flex items-center space-x-2">
+                        <span class="text-slate-400 font-bold">Date:</span>
+                        <input type="date" x-model="filterDate" class="bg-slate-950 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-lg outline-none font-mono cursor-pointer">
+                    </div>
+
+                    <!-- Clear Filters -->
+                    <button x-show="filterAction || filterDate" @click="filterAction = ''; filterDate = ''" class="text-rose-400 hover:text-rose-300 underline text-[10px] font-bold tracking-wider uppercase transition">
+                        Clear Filters
+                    </button>
+
                 </div>
                 <div class="text-xs text-slate-400 font-mono" x-text="'Showing ' + filteredLogs.length + ' of ' + logs.length + ' entries'"></div>
             </div>
@@ -136,7 +179,7 @@
                                     <td class="px-6 py-4 text-slate-300" x-text="log.patient_id"></td>
                                     <td class="px-6 py-4">
                                         <span class="px-2 py-1 rounded text-[10px] font-bold" 
-                                            :class="log.action.includes('OVERRIDE') || log.action.includes('DENIED') || log.action.includes('VIOLATION') ? 'bg-rose-950/60 text-rose-400 border border-rose-800/50' : 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/50'"
+                                            :class="log.action.includes('OVERRIDE') || log.action.includes('DENIED') || log.action.includes('VIOLATION') || log.action.includes('BRUTE') ? 'bg-rose-950/60 text-rose-400 border border-rose-800/50' : 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/50'"
                                             x-text="log.action">
                                         </span>
                                     </td>
@@ -216,11 +259,34 @@
                 verifyStatus: null,
                 verifyMessage: '',
                 brokenEntry: null,
+                
                 filterAction: '',
+                filterDate: '',
+                
+                get activeThreats() {
+                    return this.logs.filter(l => l.action === 'BRUTE_FORCE_DETECTED');
+                },
 
                 get filteredLogs() {
-                    if (!this.filterAction) return this.logs;
-                    return this.logs.filter(l => l.action.toUpperCase().includes(this.filterAction.toUpperCase()));
+                    let result = this.logs;
+
+                    if (this.filterAction) {
+                        result = result.filter(l => l.action.toUpperCase().includes(this.filterAction.toUpperCase()));
+                    }
+
+                    // The Timezone-Proof Date Filter
+                    if (this.filterDate) {
+                        result = result.filter(l => {
+                            if (!l.timestamp) return false;
+                            
+                            // Database raw strings look like "2026-09-04 23:03:34.12345"
+                            // We completely cut off the time part so JavaScript timezones don't mess it up!
+                            let dateOnly = String(l.timestamp).split(' ')[0].split('T')[0];
+                            
+                            return dateOnly === this.filterDate;
+                        });
+                    }
+                    return result;
                 },
 
                 async initDashboard() {
@@ -265,6 +331,19 @@
                             setTimeout(() => { this.verifyStatus = null; }, 5000);
                         }
                     } catch (err) { alert("Verification check failed."); }
+                },
+
+                async resetDemoLedger() {
+                    if(!confirm("WARNING: This permanently deletes all audit logs and resets the cryptographic chain to genesis. Only do this before starting a fresh demo. Continue?")) return;
+                    
+                    try {
+                        let res = await fetch('http://127.0.0.1:8000/api/admin/reset-ledger', { method: 'POST' });
+                        if(res.ok) {
+                            alert("Ledger completely wiped. Cryptographic chain reset to genesis block.");
+                            this.verifyStatus = null;
+                            this.fetchAllData();
+                        }
+                    } catch(err) { alert("Reset failed."); }
                 },
 
                 formatDate(dateString) {
