@@ -41,7 +41,7 @@
         <!-- Abuse Detection Alert -->
         <div x-show="securityAlert" x-cloak x-transition class="bg-rose-600 text-white px-6 py-3 rounded-xl shadow-2xl border-b-4 border-rose-800 font-bold flex items-center space-x-3 pointer-events-auto">
             <span class="text-xl">🚨</span>
-            <span>SECURITY ALERT: Suspicious Activity Detected. Unauthorized scope access threshold exceeded.</span>
+            <span>SECURITY ALERT: Suspicious Activity Detected. Unauthorized access threshold exceeded.</span>
             <button @click="resetSecurity()" class="ml-4 text-rose-200 hover:text-white underline text-xs">Acknowledge</button>
         </div>
 
@@ -76,7 +76,7 @@
             </div>
             <div>
                <h2 class="text-lg font-bold text-slate-900 tracking-tight">WardVault EHR</h2>
-               <p class="text-xs text-slate-500 font-medium">Hospital ABAC & Emergency Gateway</p>
+               <p class="text-xs text-slate-500 font-medium">Hospital Secure Gateway</p>
             </div>
         </div>
 
@@ -135,7 +135,7 @@
                             <span class="w-2 h-2 rounded-full bg-blue-500 mr-2"></span>
                             Patient Record Request
                         </h2>
-                        <span class="text-[11px] text-slate-500 font-mono font-semibold">ABAC Policy: Active</span>
+                        <span class="text-[11px] text-slate-500 font-mono font-semibold">Security Profile: Active</span>
                     </div>
 
                     <form @submit.prevent="requestAccess(false)" class="space-y-4">
@@ -240,14 +240,14 @@
                     <div x-show="!accessResult && !accessError" class="py-12 text-center text-slate-400">
                         <div class="w-10 h-10 mx-auto mb-3 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-lg shadow-inner">📋</div>
                         <p class="text-xs font-bold text-slate-500">Ready for clinician inquiry</p>
-                        <p class="text-[11px] text-slate-400 mt-1 font-medium">ABAC constraints will evaluate on submit</p>
+                        <p class="text-[11px] text-slate-400 mt-1 font-medium">Security rules will evaluate on submit</p>
                     </div>
 
                     <!-- POLICY DENIED -->
                     <div x-show="accessError" x-cloak class="bg-rose-50 border border-rose-200 rounded-xl p-4 text-left space-y-4 shadow-sm">
                         <div>
                             <div class="flex items-center text-rose-700 font-extrabold text-xs mb-1.5 tracking-wide">
-                                <span class="mr-2">⚠️</span> ACCESS REJECTED (POLICY VIOLATION)
+                                <span class="mr-2">⚠️</span> ACCESS REJECTED
                             </div>
                             <p class="text-xs text-rose-600 font-mono leading-relaxed" x-text="accessError"></p>
                         </div>
@@ -284,7 +284,7 @@
                         <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 space-y-3 mt-4 shadow-sm" x-show="isEmergency">
                             <h4 class="text-xs font-extrabold text-amber-700 uppercase tracking-wide">📝 Post-Treatment Rationale (REQUIRED)</h4>
                             <p class="text-[11px] text-amber-700 font-medium leading-relaxed">
-                                You performed an emergency override. You <strong class="font-extrabold text-amber-800">cannot lock or log out</strong> of this session until you select your compliance rationale below.
+                                You performed an emergency override. You <strong class="font-extrabold text-amber-800">cannot lock or log out</strong> of this session until you select your medical rationale below.
                             </p>
                             <select x-model="reason" class="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-amber-900 text-xs font-semibold outline-none shadow-sm cursor-pointer" required>
                                 <option value="" disabled selected>-- Select Authorized Rationale --</option>
@@ -308,15 +308,15 @@
             </div>
             
             <div class="space-y-3">
-                <span class="px-4 py-1.5 rounded-full text-xs font-black tracking-widest bg-rose-100 text-rose-700 border border-rose-200 uppercase shadow-sm">Critical Healthcare Interlock Triggered</span>
-                <h3 class="text-3xl font-black text-slate-900 tracking-tight">ACCESS RESTRICTED BY ABAC POLICY</h3>
+                <span class="px-4 py-1.5 rounded-full text-xs font-black tracking-widest bg-rose-100 text-rose-700 border border-rose-200 uppercase shadow-sm">Emergency Security Protocol Triggered</span>
+                <h3 class="text-3xl font-black text-slate-900 tracking-tight">PATIENT RECORD LOCKED</h3>
                 <p class="text-sm text-rose-700 font-mono font-bold bg-rose-50 p-3 rounded-xl border border-rose-200" x-text="accessError"></p>
             </div>
             
             <template x-if="isDoctor()">
                 <div class="space-y-6">
                     <p class="text-base text-slate-600 leading-relaxed max-w-xl mx-auto font-semibold">
-                        Patient care is currently blocked by policies. As an authorized physician, you may engage the override protocol to instantly force-open the record.
+                        Patient care is currently blocked by security rules. As an authorized physician, you may engage the emergency override protocol to instantly force-open the record.
                     </p>
                     <div class="space-y-4 pt-2">
                         <button @click="requestAccess(true)" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-black py-6 rounded-2xl text-2xl uppercase tracking-widest transition transform active:scale-95 flex items-center justify-center space-x-3 shadow-lg shadow-rose-600/30">
@@ -386,7 +386,6 @@
         }
         const localVault = new WardVaultDB();
 
-        // WEB AUDIO API BEEP SYNTHESIZER
         function playAlertTone(type) {
             try {
                 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -556,7 +555,7 @@
                             })
                         });
                         let data = await res.json();
-                        if (!res.ok) throw new Error(data.detail?.message || data.detail || 'Access Denied: ABAC Policy Violation');
+                        if (!res.ok) throw new Error(data.detail?.message || data.detail || 'Access Denied: Security Policy Violation');
                         
                         this.accessResult = data;
                         await localVault.savePatient(data.patient);
@@ -564,7 +563,7 @@
                         this.showModal = false;
                         this.resetSecurity(); 
                     } catch (err) {
-                        this.accessError = err.message || 'Access Denied: ABAC Policy Violation';
+                        this.accessError = err.message || 'Access Denied: Security Policy Violation';
                         
                         if (this.accessError.toLowerCase().includes("not found")) {
                             this.showModal = false;
@@ -575,7 +574,6 @@
                                 this.securityAlert = true;
                                 this.showModal = false;
                                 
-                                // NEW: Ping the backend to log this threat for the CPO Dashboard!
                                 fetch('http://127.0.0.1:8000/api/audit/threat', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },

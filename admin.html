@@ -30,12 +30,18 @@
                     <p class="text-red-200 text-sm font-mono font-bold">Multiple unauthorized access attempts blocked.</p>
                 </div>
             </div>
-            <div class="bg-red-950/50 p-3 rounded-lg border border-red-800 text-xs font-mono space-y-1">
+            <div class="bg-red-950/50 p-3 rounded-lg border border-red-800 text-xs font-mono space-y-2">
                 <template x-for="threat in activeThreats" :key="threat.current_hash">
-                    <div class="flex justify-between text-red-300 bg-red-900/30 px-2 py-1 rounded">
-                        <span><strong class="text-red-400">Target:</strong> <span x-text="threat.patient_id"></span></span>
-                        <span><strong class="text-red-400">Attacker ID:</strong> <span x-text="threat.provider_id"></span></span>
-                        <span x-text="formatDate(threat.timestamp)"></span>
+                    <div class="flex items-center justify-between text-red-300 bg-red-900/30 px-3 py-2 rounded border border-red-800/50">
+                        <div class="flex space-x-6">
+                            <span><strong class="text-red-400">Target ID:</strong> <span x-text="threat.patient_id"></span></span>
+                            <span><strong class="text-red-400">Attacker ID:</strong> <span x-text="threat.provider_id"></span></span>
+                            <span class="text-red-400/80" x-text="formatDate(threat.timestamp)"></span>
+                        </div>
+                        <!-- NEW: RECTIFY BUTTON -->
+                        <button @click="resolveThreat(threat.current_hash)" class="bg-red-700 hover:bg-red-600 text-white px-3 py-1 rounded shadow-md text-[10px] uppercase font-bold tracking-wider transition transform active:scale-95">
+                            Rectify & Clear
+                        </button>
                     </div>
                 </template>
             </div>
@@ -262,9 +268,17 @@
                 
                 filterAction: '',
                 filterDate: '',
+
+                // NEW: Keep track of which threats the CPO has acknowledged
+                resolvedThreats: [],
                 
                 get activeThreats() {
-                    return this.logs.filter(l => l.action === 'BRUTE_FORCE_DETECTED');
+                    return this.logs.filter(l => l.action === 'BRUTE_FORCE_DETECTED' && !this.resolvedThreats.includes(l.current_hash));
+                },
+
+                // NEW: Clear the notification from the screen
+                resolveThreat(hash) {
+                    this.resolvedThreats.push(hash);
                 },
 
                 get filteredLogs() {
@@ -274,15 +288,11 @@
                         result = result.filter(l => l.action.toUpperCase().includes(this.filterAction.toUpperCase()));
                     }
 
-                    // The Timezone-Proof Date Filter
                     if (this.filterDate) {
                         result = result.filter(l => {
                             if (!l.timestamp) return false;
                             
-                            // Database raw strings look like "2026-09-04 23:03:34.12345"
-                            // We completely cut off the time part so JavaScript timezones don't mess it up!
                             let dateOnly = String(l.timestamp).split(' ')[0].split('T')[0];
-                            
                             return dateOnly === this.filterDate;
                         });
                     }
@@ -341,6 +351,7 @@
                         if(res.ok) {
                             alert("Ledger completely wiped. Cryptographic chain reset to genesis block.");
                             this.verifyStatus = null;
+                            this.resolvedThreats = [];
                             this.fetchAllData();
                         }
                     } catch(err) { alert("Reset failed."); }
