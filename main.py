@@ -31,7 +31,7 @@ app.add_middleware(
 # --- REQUEST MODELS ---
 class RecordAccessRequest(BaseModel):
     patient_id: str
-    client_ward_id: str = "" # No longer mandatory for JAJA
+    client_ward_id: str = "" 
     is_emergency: bool = False
     override_reason: str = None
 
@@ -45,7 +45,6 @@ class NoteCorrectionRequest(BaseModel):
     corrected_text: str
     reason: str
 
-# NEW: Model for Brute Force Logging
 class ThreatReportRequest(BaseModel):
     patient_id: str
     description: str
@@ -67,11 +66,24 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         if not user or not verify_password(form_data.password, user["password_hash"]):
             raise HTTPException(status_code=400, detail="Incorrect ID or password")
         
+        # --- HACKATHON DEMO: HARDCODED SHIFT STATUS ---
+        # Instead of querying the database for timestamps, we hardcode 
+        # specific examples to be OFF DUTY so the demo is 100% predictable.
+        off_duty_demo_users = [
+            "UCH/26/EME/6767",  # Concha Mann - UCH
+            "UCH/26/CAR/4364",  # Savanna Johnson - UCH
+            "JAJA/26/EME/4388", # Delbert Tromp - JAJA
+            "JAJA/26/PED/5700"  # Vernita Cartwright - JAJA
+        ]
+        
+        is_on_duty = form_data.username not in off_duty_demo_users
+
         access_token = create_access_token(
             data={
                 "sub": user["id"], 
                 "role": user["speciality"], 
-                "org": user.get("organization", "ORG-UCH")
+                "org": user.get("organization", "ORG-UCH"),
+                "on_duty": is_on_duty
             }
         )
         return {"access_token": access_token, "token_type": "bearer"}
@@ -97,6 +109,7 @@ async def access_patient_record(
     current_user_id = user["sub"]
     provider_org = str(user.get("org", "")).upper()
     provider_role = str(user.get("role", "")).strip()
+    is_on_duty = user.get("on_duty", False)
 
     async with db.legacy_pool.acquire() as conn:
         patient = await conn.fetchrow("SELECT * FROM patients WHERE id = $1", req.patient_id)
@@ -105,7 +118,7 @@ async def access_patient_record(
 
         patient_org = str(patient.get("organization", "")).upper()
 
-        # STRICT CROSS-TENANT ISOLATION (Blocks JAJA from UCH and UCH from JAJA)
+        # STRICT CROSS-TENANT ISOLATION
         is_jaja_staff = "JAJA" in provider_org
         is_jaja_patient = "JAJA" in patient_org
 
@@ -120,7 +133,14 @@ async def access_patient_record(
                 status_code=403, 
                 detail=f"Access Denied: Administrative and IT roles ('{provider_role}') are strictly prohibited from viewing clinical charts."
             )
-
+# --- STRICT OFF-DUTY HARD BLOCK ---
+        # If they are off duty, they are blocked entirely. No emergency overrides allowed.
+        if not is_on_duty:
+            await log_access_event(current_user_id, "ACCESS_DENIED_OFF_DUTY", req.patient_id, "Provider attempted access outside of active shift")
+            raise HTTPException(
+                status_code=403, 
+                detail="Access Denied: You are currently OFF DUTY. All clinical access is locked until you clock in."
+            )
         is_authorized = False
         action_name = ""
 
@@ -174,23 +194,17 @@ async def access_patient_record(
             }
         }
 
-
-# --- NEW: LOG A BRUTE FORCE THREAT ---
 @app.post("/api/audit/threat")
 async def report_security_threat(req: ThreatReportRequest, user: dict = Depends(get_current_user)):
     audit_entry = await log_access_event(user["sub"], "BRUTE_FORCE_DETECTED", req.patient_id, req.description)
     return {"status": "Threat logged"}
 
-
-# --- NEW: HARD RESET LEDGER FOR DEMO PREP ---
 @app.post("/api/admin/reset-ledger")
 async def reset_ledger():
     async with db.audit_pool.acquire() as conn:
         await conn.execute("TRUNCATE TABLE audit_log RESTART IDENTITY CASCADE")
     return {"status": "Ledger reset successfully for demo"}
 
-
-# --- 4. DYNAMIC CENSUS ENDPOINT (MULTI-TENANT SECURED) ---
 @app.get("/api/patients")
 async def get_all_patients(user: dict = Depends(get_current_user)):
     try:
@@ -214,8 +228,6 @@ async def get_all_patients(user: dict = Depends(get_current_user)):
         print(f"🔥 FETCH PATIENTS ERROR: {e}")
         return []
 
-
-# --- 5. THE AUDIT LOG ENDPOINT (FOR THE CPO DASHBOARD) ---
 @app.get("/api/audit-logs")
 async def get_audit_logs():
     async with db.audit_pool.acquire() as conn:
@@ -230,8 +242,6 @@ async def get_audit_logs():
             } for l in logs
         ]
 
-
-# --- 5B. ADMIN CLINICAL NOTES INSPECTOR ENDPOINT ---
 @app.get("/api/admin/clinical-notes")
 async def get_admin_clinical_notes():
     async with db.legacy_pool.acquire() as conn:
@@ -252,8 +262,6 @@ async def get_admin_clinical_notes():
             } for n in notes
         ]
 
-
-# --- 6. APPEND-ONLY CORRECTION WORKFLOW ---
 @app.post("/api/records/notes")
 async def add_clinical_note(req: ClinicalNoteRequest, user: dict = Depends(get_current_user)):
     async with db.legacy_pool.acquire() as conn:
@@ -280,8 +288,6 @@ async def correct_clinical_note(req: NoteCorrectionRequest, user: dict = Depends
         await log_access_event(user["sub"], "RECORD_CORRECTED", req.patient_id, f"Correction ID: {correction_id} overrides Note ID: {req.original_note_id}. Reason: {req.reason}")
         return {"status": "Correction appended successfully", "correction_id": correction_id}
 
-
-# --- 7. CRYPTOGRAPHIC VERIFICATION ENDPOINT ---
 @app.get("/api/audit/verify")
 async def verify_audit_ledger():
     try:
