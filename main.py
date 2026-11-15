@@ -98,6 +98,7 @@ class AdmissionDischargeRequest(BaseModel):
 class ReferralCreateRequest(BaseModel):
     patient_id: str
     destination_facility: str
+    origin_facility: Optional[str] = "Alakia Primary Healthcare Centre"
     referring_doctor: Optional[str] = "Dr. Kemi Sanni, MBBS, MPH"
     reason: str
     urgency: Optional[str] = "Emergency Transfer"
@@ -580,11 +581,12 @@ async def create_referral(req: ReferralCreateRequest, user: dict = Depends(get_c
     if not user.get("on_duty", False):
         raise HTTPException(status_code=403, detail="You are currently OFF DUTY.")
 
+    origin_facility_name = (req.origin_facility or "").strip() or "Alakia Primary Healthcare Centre"
     doctor_name = (req.referring_doctor or "").strip() or user.get("name") or "Dr. Kemi Sanni, MBBS, MPH"
     destination = (req.destination_facility or "").strip() or "University College Hospital (UCH) Ibadan"
     
-    # Store packed clinical notes (provisional diagnosis + treatment given) into counter_referral_notes
-    packed_notes = f"DIAGNOSIS: {req.provisional_diagnosis or ''}\nINTERVENTION: {req.treatment_given or ''}"
+    # Store packed clinical notes (origin facility + provisional diagnosis + treatment given) into counter_referral_notes
+    packed_notes = f"ORIGIN: {origin_facility_name}\nDIAGNOSIS: {req.provisional_diagnosis or ''}\nINTERVENTION: {req.treatment_given or ''}"
 
     async with db.legacy_pool.acquire() as conn:
         ref_id = await conn.fetchval(
@@ -626,15 +628,21 @@ async def get_referral_transfer_slip(referral_id: int, user: dict = Depends(get_
             ORDER BY timestamp DESC LIMIT 1
         """, ref["patient_id"], hosp_no)
 
-        # Unpack custom diagnosis and treatment from packed_notes
+        # Unpack custom origin facility, diagnosis and treatment from packed_notes
+        origin_facility_name = "Alakia Primary Healthcare Centre"
         prov_diag = ""
         treat_given = ""
         notes_str = ref.get("counter_referral_notes") or ""
         for line in notes_str.split("\n"):
-            if line.startswith("DIAGNOSIS:"):
+            if line.startswith("ORIGIN:"):
+                origin_facility_name = line.replace("ORIGIN:", "").strip()
+            elif line.startswith("DIAGNOSIS:"):
                 prov_diag = line.replace("DIAGNOSIS:", "").strip()
             elif line.startswith("INTERVENTION:"):
                 treat_given = line.replace("INTERVENTION:", "").strip()
+
+        if not origin_facility_name:
+            origin_facility_name = "Alakia Primary Healthcare Centre"
 
         if not prov_diag:
             prov_diag = latest_enc.get("primary_diagnosis") if latest_enc else "Acute Clinical Referral"
@@ -648,9 +656,9 @@ async def get_referral_transfer_slip(referral_id: int, user: dict = Depends(get_
             "referral_id": ref["id"],
             "date": str(ref["created_at"])[:16],
             "facility_origin": {
-                "name": "Alakia Primary Healthcare Centre",
-                "ward": "Ward 4, Egbeda Local Government Area",
-                "state": "Oyo State, Nigeria",
+                "name": origin_facility_name,
+                "ward": "Clinical Services Division",
+                "state": "Primary Healthcare Facility",
                 "type": "Primary Healthcare Centre (PHC)",
                 "moh_code": "OY/EGB/PHC-04"
             },
