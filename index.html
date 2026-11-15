@@ -41,18 +41,27 @@
             font-weight: 600;
         }
         @media print {
-            body * { visibility: hidden; }
-            #printableSlip, #printableSlip * { visibility: visible; }
+            @page {
+                size: A4 portrait;
+                margin: 10mm 15mm;
+            }
+            body * { visibility: hidden !important; }
+            #printableSlip, #printableSlip * { visibility: visible !important; }
             #printableSlip {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                margin: 0;
-                padding: 30px;
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
                 background: white !important;
                 border: none !important;
                 box-shadow: none !important;
+                font-size: 10.5pt !important;
+                line-height: 1.35 !important;
+                page-break-inside: avoid !important;
+                page-break-after: avoid !important;
             }
             .no-print { display: none !important; }
         }
@@ -776,170 +785,111 @@
                 class="fixed top-3 right-3 z-[110] bg-rose-600 hover:bg-rose-700 text-white border-2 border-white rounded-full w-10 h-10 flex items-center justify-center shadow-2xl font-bold text-lg transition no-print" 
                 title="Exit Letter (or press Esc)">✕</button>
 
-        <div class="max-w-2xl w-full bg-white rounded-2xl p-6 sm:p-8 space-y-5 shadow-2xl my-8 relative border border-slate-300" id="printableSlip">
+        <div class="max-w-xl w-full bg-white rounded-xl p-5 space-y-2.5 shadow-2xl my-2 relative border border-slate-300 text-xs leading-normal" id="printableSlip">
             
-            <!-- Document Header Toolbar (Non-Sticky, Clean Inside Paper) -->
-            <div class="flex justify-between items-center pb-3 border-b border-slate-200 no-print">
-                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Official Medical Transfer Document</span>
-                <div class="flex items-center space-x-2">
-                    <button @click="downloadReferralLetter()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg text-xs flex items-center space-x-1 transition">
-                        <span>⬇ Download</span>
-                    </button>
-                    <button onclick="window.print()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-xs flex items-center space-x-1 transition shadow-xs">
-                        <span>🖨️ Print</span>
-                    </button>
-                    <button @click="showTransferSlipModal = false" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs flex items-center space-x-1 transition shadow-xs">
-                        <span>✕ Close</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Letter Body with UNIFORM FONT SIZE & NO AI ESSAYS -->
+            <!-- Letter Body: COMPACT SINGLE-PAGE CLINICAL CORRESPONDENCE (NO SCROLLING NEEDED) -->
             <template x-if="selectedSlip">
-                <div class="space-y-4 text-sm text-slate-800 font-sans leading-relaxed">
+                <div class="space-y-2.5 text-xs text-slate-800 font-sans leading-normal">
                     
                     <!-- Hospital Letterhead -->
-                    <div class="border-b-2 border-slate-900 pb-3">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <h2 class="text-sm font-bold uppercase tracking-tight text-slate-900" x-text="selectedSlip.facility_origin.name"></h2>
-                                <p class="text-sm text-slate-600">Clinical Referral & Patient Transfer Note</p>
-                            </div>
-                            <div class="text-right text-sm text-slate-600">
-                                <p>Date: <span class="font-medium text-slate-900" x-text="selectedSlip.date"></span></p>
-                                <p>Ref: <span class="font-mono font-medium text-slate-900" x-text="selectedSlip.slip_number"></span></p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Addressee -->
-                    <div class="space-y-0.5 text-sm">
-                        <p class="font-semibold text-slate-700">To: The Medical Director / Receiving Clinical Team</p>
-                        <p class="font-bold text-slate-900" x-text="selectedSlip.destination_facility"></p>
-                    </div>
-
-                    <!-- Salutation & Subject -->
-                    <div class="space-y-1 text-sm pt-1">
-                        <p>Dear Colleague,</p>
-                        <p class="font-bold uppercase tracking-wide text-slate-900">
-                            RE: CLINICAL REFERRAL OF <span x-text="selectedSlip.patient.name"></span> 
-                            (HOSPITAL NO: <span x-text="selectedSlip.patient.hospital_number"></span>, AGE: <span x-text="selectedSlip.patient.age"></span>, SEX: <span x-text="selectedSlip.patient.gender"></span>)
-                        </p>
-                    </div>
-
-                    <!-- Concise Clinical Presentation (Natural Doctor Wording) -->
-                    <div class="space-y-2 text-sm">
-                        <p>
-                            Thank you for seeing <span class="font-semibold" x-text="selectedSlip.patient.name"></span>, who presented to <span class="font-medium" x-text="selectedSlip.facility_origin.name"></span> on <span x-text="selectedSlip.date"></span>.
-                        </p>
+                    <div class="border-b-2 border-slate-900 pb-2 flex justify-between items-start">
                         <div>
-                            <p class="font-semibold text-slate-900">Presenting Complaint & History:</p>
-                            <p class="text-sm text-slate-800 pt-0.5" x-text="selectedSlip.clinical.clinical_reason"></p>
+                            <h2 class="text-xs font-bold uppercase tracking-tight text-slate-900" x-text="selectedSlip.facility_origin.name"></h2>
+                            <p class="text-[11px] text-slate-500">Official Clinical Referral & Patient Transfer Slip</p>
+                        </div>
+                        <div class="text-right text-[11px] text-slate-600">
+                            <p>Date: <span class="font-medium text-slate-900" x-text="selectedSlip.date"></span></p>
+                            <p>Ref: <span class="font-mono font-bold text-slate-900" x-text="selectedSlip.slip_number"></span></p>
                         </div>
                     </div>
 
-                    <!-- Clinical Summary Table with UNIFORM FONT SIZE (text-sm) -->
-                    <div class="border border-slate-300 rounded overflow-hidden">
-                        <table class="w-full text-sm text-left border-collapse">
+                    <!-- Addressee & Subject -->
+                    <div class="space-y-0.5 text-xs">
+                        <p class="text-slate-500 text-[11px]">To: The Medical Director / Receiving Clinical Team</p>
+                        <p class="font-bold text-slate-900 text-xs" x-text="selectedSlip.destination_facility"></p>
+                        <p class="font-bold uppercase tracking-wide text-slate-900 pt-1">
+                            RE: CLINICAL REFERRAL OF <span x-text="selectedSlip.patient.name"></span> 
+                            (<span x-text="selectedSlip.patient.hospital_number"></span> • <span x-text="selectedSlip.patient.age"></span> YRS • <span x-text="selectedSlip.patient.gender"></span>)
+                        </p>
+                    </div>
+
+                    <!-- Concise Clinical Presentation -->
+                    <div class="space-y-1 text-xs">
+                        <p class="text-slate-700">
+                            Thank you for seeing <b class="text-slate-900" x-text="selectedSlip.patient.name"></b>, who presented to <span x-text="selectedSlip.facility_origin.name"></span> on <span x-text="selectedSlip.date"></span> with:
+                        </p>
+                        <p class="bg-slate-50 p-2 rounded border border-slate-200 text-slate-900 font-medium" x-text="selectedSlip.clinical.clinical_reason"></p>
+                    </div>
+
+                    <!-- Clinical Summary Table with Compact Padding (Fits strictly on 1 Page) -->
+                    <div class="border border-slate-300 rounded overflow-hidden text-xs">
+                        <table class="w-full text-left border-collapse">
                             <thead>
-                                <tr class="bg-slate-100 border-b border-slate-300 font-semibold text-slate-900">
-                                    <th class="p-2.5 border-r border-slate-300 w-1/3">Condition / Diagnosis</th>
-                                    <th class="p-2.5 border-r border-slate-300 w-1/3">Vitals at Transfer</th>
-                                    <th class="p-2.5 w-1/3">Treatment / Intervention Given</th>
+                                <tr class="bg-slate-100 border-b border-slate-300 font-semibold text-slate-800 text-[11px]">
+                                    <th class="py-1 px-2 border-r border-slate-300 w-1/3">Condition / Diagnosis</th>
+                                    <th class="py-1 px-2 border-r border-slate-300 w-1/3">Vitals at Transfer</th>
+                                    <th class="py-1 px-2 w-1/3">Treatment Given</th>
                                 </tr>
                             </thead>
                             <tbody class="text-slate-800">
                                 <tr>
-                                    <td class="p-2.5 border-r border-slate-300 align-top" x-text="selectedSlip.clinical.provisional_diagnosis || selectedSlip.patient.condition || 'Clinical Referral'"></td>
-                                    <td class="p-2.5 border-r border-slate-300 align-top">
+                                    <td class="py-1.5 px-2 border-r border-slate-300 align-top font-medium" x-text="selectedSlip.clinical.provisional_diagnosis || selectedSlip.patient.condition || 'Clinical Referral'"></td>
+                                    <td class="py-1.5 px-2 border-r border-slate-300 align-top">
                                         <p x-text="selectedSlip.clinical.transfer_vitals || 'Stable at departure'"></p>
-                                        <p class="text-xs text-slate-500 mt-1" x-text="'Genotype: ' + selectedSlip.patient.genotype + ' • Blood Group: ' + selectedSlip.patient.blood_group"></p>
+                                        <p class="text-[10px] text-slate-500 mt-0.5" x-text="'Genotype: ' + selectedSlip.patient.genotype + ' • Blood Group: ' + selectedSlip.patient.blood_group"></p>
                                     </td>
-                                    <td class="p-2.5 align-top" x-text="selectedSlip.clinical.emergency_treatment_given || 'Initial emergency stabilization provided'"></td>
+                                    <td class="py-1.5 px-2 align-top" x-text="selectedSlip.clinical.emergency_treatment_given || 'Initial emergency stabilization provided'"></td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
 
                     <!-- Direct Closing Request -->
-                    <div class="space-y-1 text-sm pt-1">
-                        <p>
-                            Kindly review the patient for further evaluation and definitive management. We will appreciate receiving counter-referral feedback or a summary note upon discharge.
-                        </p>
-                    </div>
+                    <p class="text-xs text-slate-700">
+                        Kindly review the patient for further evaluation and definitive management. Counter-referral feedback or discharge summary is appreciated.
+                    </p>
 
-                    <!-- Sign-off -->
-                    <div class="pt-4 space-y-1 text-sm">
-                        <p>Yours faithfully,</p>
-                        <div class="pt-2">
-                            <p class="font-bold text-slate-900" x-text="selectedSlip.referred_by.name"></p>
-                            <p class="text-slate-700" x-text="selectedSlip.facility_origin.name"></p>
-                            <p class="text-xs text-slate-500 pt-0.5">Official Facility Stamp / Verified Clinical Record</p>
+                    <!-- Sign-off (Compact) -->
+                    <div class="flex justify-between items-end pt-1 text-xs text-slate-700">
+                        <div>
+                            <p>Yours faithfully,</p>
+                            <p class="font-bold text-slate-900 mt-0.5" x-text="selectedSlip.referred_by.name"></p>
+                            <p class="text-[11px] text-slate-500" x-text="selectedSlip.facility_origin.name + ' • Clinical Services'"></p>
+                        </div>
+                        <div class="text-right text-[10px] text-slate-400 font-mono">
+                            MOH Code: <span x-text="selectedSlip.facility_origin.moh_code"></span>
                         </div>
                     </div>
 
-                    <!-- SECTION 5: RECEIVING HOSPITAL HANDOVER & COUNTER-REFERRAL OUTCOME -->
-                    <div class="pt-4 border-t-2 border-slate-200 space-y-2">
-                        <div class="flex justify-between items-center">
-                            <p class="font-bold text-xs uppercase tracking-wide text-slate-700">Receiving Hospital Handover & Counter-Referral Record</p>
-                            <template x-if="selectedSlip.handover_report && selectedSlip.handover_report.is_confirmed">
-                                <span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold rounded text-[11px]">✅ Handover Confirmed & Outcome Reported</span>
-                            </template>
-                            <template x-if="!selectedSlip.handover_report || !selectedSlip.handover_report.is_confirmed">
-                                <span class="px-2 py-0.5 bg-amber-100 text-amber-800 font-bold rounded text-[11px]">⏳ Transfer Pending Handover Confirmation</span>
-                            </template>
-                        </div>
-
+                    <!-- SECTION 5: RECEIVING HOSPITAL HANDOVER & COUNTER-REFERRAL OUTCOME (COMPACT) -->
+                    <div class="pt-2 border-t border-slate-200 space-y-1">
                         <!-- If Confirmed -->
                         <template x-if="selectedSlip.handover_report && selectedSlip.handover_report.is_confirmed">
-                            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 space-y-1.5 text-xs text-slate-800">
-                                <div class="grid grid-cols-2 gap-2">
+                            <div class="bg-emerald-50 border border-emerald-300 rounded p-2 text-xs text-slate-800 space-y-1">
+                                <div class="flex justify-between items-center text-emerald-900 font-bold text-[11px]">
+                                    <span>✅ Receiving Hospital Handover Confirmed & Reported</span>
+                                    <span class="text-[10px] font-normal" x-text="selectedSlip.handover_report.confirmed_at"></span>
+                                </div>
+                                <div class="grid grid-cols-2 gap-1 text-[11px]">
                                     <p><b>Receiving Clinician:</b> <span x-text="selectedSlip.handover_report.receiving_officer"></span></p>
                                     <p><b>Ward / Unit:</b> <span x-text="selectedSlip.handover_report.receiving_ward"></span></p>
-                                    <p><b>Condition on Arrival:</b> <span x-text="selectedSlip.handover_report.arrival_vitals"></span></p>
-                                    <p><b>Handover Outcome:</b> <span class="font-semibold text-emerald-900" x-text="selectedSlip.handover_report.handover_outcome"></span></p>
+                                    <p><b>Arrival Vitals:</b> <span x-text="selectedSlip.handover_report.arrival_vitals"></span></p>
+                                    <p><b>Outcome:</b> <span class="font-semibold text-emerald-900" x-text="selectedSlip.handover_report.handover_outcome"></span></p>
                                 </div>
-                                <p class="pt-1 border-t border-emerald-200"><b>Clinical Handover Summary / Notes:</b> <span x-text="selectedSlip.handover_report.report_notes"></span></p>
-                                <div class="flex justify-between items-center pt-1 text-[11px] text-emerald-700">
-                                    <span>Confirmed: <b x-text="selectedSlip.handover_report.confirmed_at"></b></span>
-                                    <span>Escort Officer: <b x-text="selectedSlip.handover_report.escort_staff"></b></span>
-                                </div>
+                                <p class="pt-0.5 text-[11px] text-slate-700 border-t border-emerald-200"><b>Handover Summary:</b> <span x-text="selectedSlip.handover_report.report_notes"></span></p>
                             </div>
                         </template>
 
                         <!-- If Pending Handover -->
                         <template x-if="!selectedSlip.handover_report || !selectedSlip.handover_report.is_confirmed">
-                            <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 flex justify-between items-center no-print">
-                                <div class="text-xs text-slate-600">
-                                    <p class="font-semibold text-slate-800">Awaiting arrival verification at <span x-text="selectedSlip.destination_facility"></span>.</p>
-                                    <p class="text-[11px]">Confirm receiving officer, ward admission, and handover outcome to close the transfer loop.</p>
-                                </div>
+                            <div class="bg-slate-50 border border-slate-200 rounded p-2 flex justify-between items-center no-print text-[11px]">
+                                <span class="text-slate-600">⏳ Awaiting handover confirmation at <b class="text-slate-800" x-text="selectedSlip.destination_facility"></b></span>
                                 <button @click="openHandoverModal(selectedSlip.referral_id)" 
-                                        class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs shadow transition">
+                                        class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded shadow transition">
                                     📝 Confirm Handover & Report
                                 </button>
                             </div>
                         </template>
-                    </div>
-
-                    <!-- Bottom Exit & Download Actions (Secondary Exit at Bottom) -->
-                    <div class="pt-5 border-t border-slate-200 flex flex-wrap justify-between items-center gap-2 no-print">
-                        <button @click="showTransferSlipModal = false" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg text-xs transition">
-                            ← Exit Letter View
-                        </button>
-                        <div class="flex items-center space-x-2">
-                            <template x-if="!selectedSlip.handover_report || !selectedSlip.handover_report.is_confirmed">
-                                <button @click="openHandoverModal(selectedSlip.referral_id)" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition shadow">
-                                    📝 Confirm Handover & Report
-                                </button>
-                            </template>
-                            <button @click="downloadReferralLetter()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg text-xs transition">
-                                ⬇ Download File (.html)
-                            </button>
-                            <button @click="showTransferSlipModal = false" class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs transition shadow">
-                                Done (Close)
-                            </button>
-                        </div>
                     </div>
 
                 </div>
@@ -1993,15 +1943,16 @@
     <meta charset="utf-8">
     <title>Referral Letter - ${slip.patient.name} (${slip.slip_number})</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #111; margin: 40px auto; max-width: 750px; }
-        .header { border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 20px; }
-        .title { font-size: 15px; font-weight: bold; text-transform: uppercase; margin-bottom: 4px; }
-        .meta { display: flex; justify-content: space-between; font-size: 13px; color: #555; margin-top: 10px; }
-        .section { margin-bottom: 16px; }
-        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
-        th, td { border: 1px solid #ccc; padding: 10px; text-align: left; font-size: 13px; }
+        @page { size: A4 portrait; margin: 12mm 15mm; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 10.5pt; line-height: 1.35; color: #111; margin: 0 auto; max-width: 680px; padding: 15px; }
+        .header { border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 10px; }
+        .title { font-size: 12pt; font-weight: bold; text-transform: uppercase; margin-bottom: 2px; }
+        .meta { display: flex; justify-content: space-between; font-size: 9.5pt; color: #555; margin-top: 4px; }
+        .section { margin-bottom: 8px; font-size: 10pt; }
+        table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+        th, td { border: 1px solid #ccc; padding: 5px 8px; text-align: left; font-size: 9.5pt; }
         th { background: #f5f5f5; font-weight: bold; }
-        .sign { margin-top: 35px; }
+        .sign { margin-top: 14px; page-break-inside: avoid; }
     </style>
 </head>
 <body>
