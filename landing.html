@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WardVault PHC | Offline-First Healthcare Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            200: '#a7f3d0',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            800: '#065f46',
+                            900: '#064e3b',
+                            950: '#022c22'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .hero-glow {
+            background: radial-gradient(circle at 50% 20%, rgba(16, 185, 129, 0.12) 0%, rgba(255, 255, 255, 0) 70%);
+        }
+    </style>
+</head>
+<body class="bg-white text-slate-800 font-sans antialiased selection:bg-brand-500 selection:text-white">
+
+    <!-- NAVIGATION BAR -->
+    <header class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-100">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="h-11 w-11 rounded-2xl bg-brand-700 text-white flex items-center justify-center font-extrabold text-xl shadow-lg shadow-brand-700/20">
+                    🏥
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xl font-extrabold tracking-tight text-slate-900">WardVault</span>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200">PHC Gateway</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 font-medium">Care Coordination for Underserved Facilities</p>
+                </div>
+            </div>
+
+            <nav class="hidden md:flex items-center space-x-8 text-sm font-semibold text-slate-600">
+                <a href="#problem" class="hover:text-brand-700 transition">The Reality</a>
+                <a href="#solution" class="hover:text-brand-700 transition">Offline Architecture</a>
+                <a href="#features" class="hover:text-brand-700 transition">Care Coordination</a>
+                <a href="#compliance" class="hover:text-brand-700 transition">NDPA 2023 Trust</a>
+            </nav>
+
+            <div class="flex items-center space-x-3">
+                <a href="/admin" class="hidden sm:inline-flex items-center space-x-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-4 py-2.5 rounded-xl transition">
+                    <span>🛡️</span>
+                    <span>CPO SIEM Portal</span>
+                </a>
+                <a href="/app" class="inline-flex items-center space-x-2 text-xs font-bold text-white bg-brand-700 hover:bg-brand-800 px-5 py-2.5 rounded-xl shadow-lg shadow-brand-700/25 transition transform active:scale-95">
+                    <span>Launch Clinical Station</span>
+                    <span>→</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- HERO SECTION -->
+    <section class="hero-glow pt-16 pb-24 border-b border-slate-100">
+        <div class="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+            
+            <div class="lg:col-span-7 space-y-6">
+                <div class="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-brand-50 border border-brand-200/80 text-brand-800 text-xs font-bold shadow-sm">
+                    <span class="flex h-2 w-2 rounded-full bg-brand-500 animate-pulse"></span>
+                    <span>USPF Changemaker Challenge • Track C Healthcare</span>
+                </div>
+
+                <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.12]">
+                    Digitizing Primary Healthcare <span class="text-brand-700">Without Waiting</span> for Constant Internet.
+                </h1>
+
+                <p class="text-base sm:text-lg text-slate-600 leading-relaxed max-w-2xl font-normal">
+                    WardVault is an offline-first, implementation-supported patient records and care-coordination platform engineered for Primary Healthcare Centres (PHCs). Designed to keep nurses, CHEWs, and records officers working smoothly through power outages and network failure.
+                </p>
+
+                <div class="flex flex-wrap items-center gap-4 pt-2">
+                    <a href="/app" class="inline-flex items-center space-x-2 text-sm font-bold text-white bg-brand-700 hover:bg-brand-800 px-6 py-3.5 rounded-2xl shadow-xl shadow-brand-700/20 transition transform active:scale-95">
+                        <span>Open Live Clinic Station</span>
+                        <span>→</span>
+                    </a>
+                    <a href="/admin" class="inline-flex items-center space-x-2 text-sm font-bold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 px-6 py-3.5 rounded-2xl transition">
+                        <span>View Cryptographic SIEM</span>
+                    </a>
+                </div>
+
+                <!-- Verified Micro-Trust Badges -->
+                <div class="pt-6 border-t border-slate-100 flex flex-wrap items-center gap-6 text-xs text-slate-500 font-medium">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-brand-600 font-bold">✓</span>
+                        <span>100% Offline LAN Operation</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-brand-600 font-bold">✓</span>
+                        <span>Managed Paper-to-Digital Intake</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-brand-600 font-bold">✓</span>
+                        <span>NDPA 2023 SHA-256 Ledger</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Hero Card: Live Interactive Preview Card -->
+            <div class="lg:col-span-5">
+                <div class="relative bg-white rounded-3xl p-6 shadow-2xl border border-slate-100/80 space-y-5">
+                    
+                    <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+                        <div class="flex items-center space-x-3">
+                            <div class="h-10 w-10 rounded-xl bg-brand-50 border border-brand-200 flex items-center justify-center font-bold text-brand-700">
+                                🩺
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-900 leading-tight">Alakia PHC Consultation</h3>
+                                <p class="text-[11px] text-slate-400">Station Active • CHEW Amina Bello</p>
+                            </div>
+                        </div>
+                        <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-brand-100 text-brand-800 border border-brand-200">
+                            Local LAN Active
+                        </span>
+                    </div>
+
+                    <!-- Patient Triage Preview -->
+                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-3">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="font-bold text-slate-800">Zainab Aliyu (ANC-042)</span>
+                            <span class="font-mono text-[10px] text-brand-700 font-bold">26 yrs • Female</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 text-center">
+                            <div class="bg-white p-2 rounded-xl border border-slate-100">
+                                <span class="text-[9px] text-slate-400 uppercase font-bold block">BP</span>
+                                <span class="font-mono font-bold text-slate-900 text-xs">118/76</span>
+                            </div>
+                            <div class="bg-white p-2 rounded-xl border border-slate-100">
+                                <span class="text-[9px] text-slate-400 uppercase font-bold block">Temp</span>
+                                <span class="font-mono font-bold text-slate-900 text-xs">37.2°C</span>
+                            </div>
+                            <div class="bg-white p-2 rounded-xl border border-slate-100">
+                                <span class="text-[9px] text-slate-400 uppercase font-bold block">mRDT</span>
+                                <span class="font-mono font-bold text-rose-600 text-xs">Pos (Pf)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Secondary Referral Link Preview -->
+                    <div class="p-3.5 bg-purple-50/70 border border-purple-200/80 rounded-2xl space-y-1.5 text-xs">
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-purple-900">Secondary Referral Registered</span>
+                            <span class="text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-purple-200 text-purple-900">Urgent</span>
+                        </div>
+                        <p class="text-[11px] text-purple-800">
+                            Referred to <strong>University College Hospital (UCH) Ibadan</strong> for specialist assessment.
+                        </p>
+                    </div>
+
+                    <!-- Live Cryptographic Proof Footer -->
+                    <div class="bg-slate-900 rounded-2xl p-4 font-mono text-[10px] text-slate-300 space-y-1 shadow-inner">
+                        <div class="flex justify-between text-slate-400 border-b border-slate-800 pb-1">
+                            <span>SHA-256 BLOCK PROOF:</span>
+                            <span class="text-brand-400 font-bold">TAMPER-EVIDENT</span>
+                        </div>
+                        <p class="text-brand-300 truncate">787a9deba783aed400279053024e3fa90812abff</p>
+                        <p class="text-[9px] text-slate-500">NDPA 2023 Chained Ledger • 100% Verified</p>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- 2026 NIGERIA TECH OUTLOOK BENCHMARK BAR -->
+    <section id="problem" class="bg-slate-950 text-white py-12 border-y border-slate-900">
+        <div class="max-w-7xl mx-auto px-6 space-y-6">
+            <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider">The Primary Healthcare Technology Gap</h3>
+                    <p class="text-xs text-slate-400">Data source: 2026 Nigeria Tech Outlook Report (NITDA & National Bureau of Statistics across 539 PHCs)</p>
+                </div>
+                <span class="text-[10px] font-mono bg-slate-900 text-brand-400 border border-brand-900/50 px-3 py-1 rounded-full">Self-Reported Facility Baseline</span>
+            </div>
+
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="space-y-1">
+                    <p class="text-3xl sm:text-4xl font-extrabold text-white font-mono">16.2%</p>
+                    <p class="text-xs text-slate-400 font-medium">PHCs have working internet connection</p>
+                    <div class="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                        <div class="bg-rose-500 h-full w-[16.2%]"></div>
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <p class="text-3xl sm:text-4xl font-extrabold text-white font-mono">37.8%</p>
+                    <p class="text-xs text-slate-400 font-medium">Have computers or tablets in use for records</p>
+                    <div class="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                        <div class="bg-amber-500 h-full w-[37.8%]"></div>
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <p class="text-3xl sm:text-4xl font-extrabold text-white font-mono">26.4%</p>
+                    <p class="text-xs text-slate-400 font-medium">Keep electronic or mixed patient records</p>
+                    <div class="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                        <div class="bg-orange-500 h-full w-[26.4%]"></div>
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <p class="text-3xl sm:text-4xl font-extrabold text-brand-400 font-mono">100%</p>
+                    <p class="text-xs text-brand-200 font-medium">WardVault local offline functionality</p>
+                    <div class="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                        <div class="bg-brand-500 h-full w-full"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PHC CLINICAL SERVICES FOCUS STRIP -->
+    <section class="py-12 bg-white border-b border-slate-100">
+        <div class="max-w-7xl mx-auto px-6 space-y-6">
+            <div class="text-center space-y-2">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-brand-700 bg-brand-50 px-3 py-1 rounded-full border border-brand-200">Facility Scope</span>
+                <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Essential PHC Clinical Workflows Covered</h3>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100 text-center space-y-2 hover:bg-brand-50/50 hover:border-brand-200 transition">
+                    <span class="text-2xl">🤰</span>
+                    <h4 class="font-bold text-xs text-slate-900">Antenatal Care (ANC)</h4>
+                    <p class="text-[11px] text-slate-500">Maternal tracking & gestational vitals</p>
+                </div>
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100 text-center space-y-2 hover:bg-brand-50/50 hover:border-brand-200 transition">
+                    <span class="text-2xl">💉</span>
+                    <h4 class="font-bold text-xs text-slate-900">Immunization (EPI)</h4>
+                    <p class="text-[11px] text-slate-500">Childhood vaccine schedules</p>
+                </div>
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100 text-center space-y-2 hover:bg-brand-50/50 hover:border-brand-200 transition">
+                    <span class="text-2xl">🩺</span>
+                    <h4 class="font-bold text-xs text-slate-900">Outpatient Triage</h4>
+                    <p class="text-[11px] text-slate-500">Malaria mRDT & syndromic consults</p>
+                </div>
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100 text-center space-y-2 hover:bg-brand-50/50 hover:border-brand-200 transition">
+                    <span class="text-2xl">📁</span>
+                    <h4 class="font-bold text-xs text-slate-900">Paper Migration</h4>
+                    <p class="text-[11px] text-slate-500">Safeguarded dual-pass folder review</p>
+                </div>
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100 text-center space-y-2 hover:bg-brand-50/50 hover:border-brand-200 transition">
+                    <span class="text-2xl">🔄</span>
+                    <h4 class="font-bold text-xs text-slate-900">Hospital Referrals</h4>
+                    <p class="text-[11px] text-slate-500">UCH & General Hospital transfer loop</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CORE STRATEGIC PILLARS -->
+    <section id="solution" class="py-20 bg-slate-50/50">
+        <div class="max-w-7xl mx-auto px-6 space-y-14">
+            
+            <div class="text-center max-w-3xl mx-auto space-y-3">
+                <span class="text-xs font-bold uppercase tracking-wider text-brand-700 bg-brand-50 px-3 py-1 rounded-full border border-brand-200">Engineering for Reality</span>
+                <h2 class="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">Four Reasons WardVault Solves the PHC Implementation Gap</h2>
+                <p class="text-sm text-slate-600">Most hospital software expects an urban teaching hospital. WardVault is built from the ground up for the resource-constrained facility.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                
+                <!-- Pillar 1 -->
+                <div class="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-3 hover:shadow-md transition">
+                    <div class="h-12 w-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-xl font-bold">
+                        📡
+                    </div>
+                    <h3 class="text-base font-bold text-slate-900">Local-First, Not Merely Mobile</h3>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        A facility laptop acts as the local hub. CHEW tablets connect over a local Wi-Fi router with zero internet required. Changes queue in encrypted IndexedDB and sync automatically when network returns.
+                    </p>
+                </div>
+
+                <!-- Pillar 2 -->
+                <div class="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-3 hover:shadow-md transition">
+                    <div class="h-12 w-12 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center text-xl font-bold">
+                        📄
+                    </div>
+                    <h3 class="text-base font-bold text-slate-900">Managed Paper Migration</h3>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        PHCs cannot throw away paper folders. WardVault includes a structured intake workflow with a critical safeguard: clerks flag illegible notes for clinical review rather than guessing handwriting.
+                    </p>
+                </div>
+
+                <!-- Pillar 3 -->
+                <div class="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-3 hover:shadow-md transition">
+                    <div class="h-12 w-12 rounded-2xl bg-purple-50 text-purple-700 flex items-center justify-center text-xl font-bold">
+                        🔄
+                    </div>
+                    <h3 class="text-base font-bold text-slate-900">Care Coordination</h3>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        PHCs must transfer complex cases. WardVault generates secondary transfer slips to General Hospitals or UCH and tracks patient attendance, closing the primary-secondary feedback loop.
+                    </p>
+                </div>
+
+                <!-- Pillar 4 -->
+                <div class="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-3 hover:shadow-md transition">
+                    <div class="h-12 w-12 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center text-xl font-bold">
+                        🔋
+                    </div>
+                    <h3 class="text-base font-bold text-slate-900">Hardware Power Alarms</h3>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        With 38.7% of PHCs experiencing blackouts, WardVault monitors battery levels through the Web Audio & Battery API, alerting nurses with audio tones to switch to solar backup before devices die.
+                    </p>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- COMPLIANCE & PRIVACY (NDPA 2023) -->
+    <section id="compliance" class="py-16 bg-white border-t border-slate-100">
+        <div class="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            
+            <div class="space-y-4">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Regulatory Trust</span>
+                <h2 class="text-3xl font-black text-slate-900 tracking-tight">Nigeria Data Protection Act (NDPA) 2023 Built In</h2>
+                <p class="text-sm text-slate-600 leading-relaxed">
+                    Health records involve children, mothers, and sensitive diagnoses. WardVault does not rely on standard database logs that can be secretly modified by anyone with root access.
+                </p>
+                <div class="space-y-3 text-xs text-slate-700">
+                    <div class="flex items-start space-x-3">
+                        <span class="font-bold text-brand-700 mt-0.5">🔒</span>
+                        <span><strong>Cryptographic Hash Chaining:</strong> Each consultation and note is chained to the previous record with SHA-256. Altering any past record breaks the chain instantly.</span>
+                    </div>
+                    <div class="flex items-start space-x-3">
+                        <span class="font-bold text-brand-700 mt-0.5">📝</span>
+                        <span><strong>Append-Only Amendments:</strong> Staff cannot retroactively overwrite notes; clinical corrections link via <code>supersedes_note_id</code> with audited clinical reasons.</span>
+                    </div>
+                    <div class="flex items-start space-x-3">
+                        <span class="font-bold text-brand-700 mt-0.5">🛡️</span>
+                        <span><strong>SIEM Command Center:</strong> Independent dashboard for the Chief Privacy Officer to scan and verify ledger integrity with one click.</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-slate-950 p-6 rounded-3xl text-slate-300 font-mono text-xs space-y-4 border border-slate-800 shadow-2xl">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                    <span class="text-emerald-400 font-bold text-sm">🛡️ CPO Cryptographic Audit Proof</span>
+                    <span class="bg-emerald-950 text-emerald-400 text-[10px] px-2.5 py-1 rounded-full border border-emerald-800">100% SECURE</span>
+                </div>
+                <div class="space-y-2 text-[11px] text-slate-400">
+                    <p>Genesis Block: <code class="text-emerald-300">f763eea0d31855c...</code></p>
+                    <p>Encounter Block #2: <code class="text-emerald-300">f3cec0fec7df4d4...</code></p>
+                    <p>Referral Block #3: <code class="text-emerald-300">b9a1284e9081a2f...</code></p>
+                </div>
+                <div class="pt-3 border-t border-slate-800 flex justify-between items-center text-xs">
+                    <span class="text-slate-400">Integrity Verification:</span>
+                    <a href="/admin" class="text-brand-400 hover:text-brand-300 underline font-bold">Open Full SIEM Inspector →</a>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- CALL TO ACTION / LAUNCH STATION -->
+    <section class="py-20 bg-brand-950 text-white text-center">
+        <div class="max-w-4xl mx-auto px-6 space-y-6">
+            <span class="px-3.5 py-1 rounded-full text-xs font-bold bg-brand-900 text-brand-200 border border-brand-800">
+                USPF Evaluator Quick Access
+            </span>
+            <h2 class="text-3xl sm:text-4xl font-black tracking-tight">
+                Experience the Working WardVault PHC Station
+            </h2>
+            <p class="text-sm sm:text-base text-brand-200 max-w-xl mx-auto font-normal">
+                Pre-seeded with 278 healthcare providers and 114 patients. Explore consultation triage, referral tracking, and paper migration live.
+            </p>
+            <div class="pt-4 flex flex-wrap justify-center gap-4">
+                <a href="/app" class="px-8 py-4 bg-brand-500 hover:bg-brand-600 text-slate-950 font-extrabold rounded-2xl shadow-xl transition transform active:scale-95 text-sm">
+                    Launch Clinical Workstation →
+                </a>
+                <a href="/admin" class="px-8 py-4 bg-brand-900 hover:bg-brand-800 text-white font-bold rounded-2xl border border-brand-700 transition text-sm">
+                    Open CPO Audit Dashboard
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="bg-white border-t border-slate-100 py-10">
+        <div class="max-w-7xl mx-auto px-6 flex flex-wrap justify-between items-center gap-4 text-xs text-slate-400">
+            <div>
+                <p class="font-bold text-slate-700">WardVault PHC Gateway 2.0</p>
+                <p>Built by The Alpha Hunters (Emmanuel Ikeh, Joseph, Glory) for the USPF Changemaker Challenge.</p>
+            </div>
+            <div class="flex space-x-6">
+                <a href="/app" class="hover:text-brand-700 transition font-semibold">Clinical Station</a>
+                <a href="/admin" class="hover:text-brand-700 transition font-semibold">Audit Console</a>
+                <a href="/docs" class="hover:text-brand-700 transition font-semibold">API Specs</a>
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>

@@ -108,18 +108,36 @@ async def health_check():
     }
 
 @app.get("/")
-async def serve_index():
+async def serve_root():
+    landing_file = os.path.abspath("landing.html")
+    if os.path.exists(landing_file):
+        return FileResponse(landing_file)
     index_file = os.path.abspath("index.html")
     if os.path.exists(index_file):
         return FileResponse(index_file)
     return {"message": "WardVault PHC Gateway Active. API available at /docs"}
+
+@app.get("/landing")
+async def serve_landing():
+    landing_file = os.path.abspath("landing.html")
+    if os.path.exists(landing_file):
+        return FileResponse(landing_file)
+    return {"message": "Landing page not found"}
+
+@app.get("/app")
+@app.get("/index.html")
+async def serve_app():
+    index_file = os.path.abspath("index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    return {"message": "Clinical application station not found"}
 
 @app.get("/admin")
 async def serve_admin():
     admin_file = os.path.abspath("admin.html")
     if os.path.exists(admin_file):
         return FileResponse(admin_file)
-    return {"message": "Admin dashboard not found"}
+    return {"message": "Admin SIEM dashboard not found"}
 
 # --- AUTHENTICATION & TOKENS ---
 @app.post("/api/login")

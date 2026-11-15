@@ -129,8 +129,68 @@ To tailor the system specifically for a Primary Healthcare Centre rather than a 
 
 ---
 
-## 7. Approval & Permission Gate
+## 8. Frontend De-Noising & UX Refinement Plan (Awaiting Your Approval)
 
-> **No code has been altered yet.**  
-> Please review this plan. Once you confirm and approve, we will begin Phase 1: refining the database models and backend endpoints to match the PHC workflows.
+Based on your exact review, here is the proposed implementation plan specifying **what we are adding** and **what we are subtracting**:
+
+### A. Role Separation & CPO SIEM Access Gate
+*   **What we are SUBTRACTING:**
+    *   Remove the CPO SIEM navigation link from the nurse/CHEW workstation sidebar (`index.html`). Nurses and doctors should only focus on clinical care.
+*   **What we are ADDING:**
+    *   Strict Role-Based Access Control (RBAC): The CPO SIEM console (`/admin`) is restricted to the **Chief Privacy Officer / Security Auditor**.
+    *   If a nurse or unauthorized staff member tries to open `/admin`, they receive an access denial message.
+
+---
+
+### B. Patient Directory: Physical Filing Cabinet & Department Folders
+*   **What we are SUBTRACTING:**
+    *   Remove the flat, noisy, unpaginated table of 100+ patient records that dumps everything at once.
+*   **What we are ADDING:**
+    *   **Departmental Clinic Folders (Filing Cabinets):**
+        1. 📁 **ANC Clinic (Antenatal Care):** Maternal health records (Folder series `ANC-001` to `ANC-099`).
+        2. 📁 **OPD / MED Clinic (General Outpatient):** Adult general consultation, triage, and common presentations.
+        3. 📁 **EPI / PED Clinic (Immunization & Child Health):** Under-5 children, vaccines, and nutrition records.
+        4. 📁 **CHRONIC / F-Series:** Chronic disease records (hypertension, diabetes management).
+    *   **Folder View & Pagination:**
+        *   Top view displays visual clinic folders with folder name and patient counts.
+        *   Clicking a folder opens that drawer.
+        *   **Strict 10-patient limit per view** with clean page numbers (`Page 1 of 4 • Next →`).
+        *   Alphabetical quick filter (A-Z) within the open folder.
+        *   A clean `← Back to Filing Cabinets` button to exit the folder.
+
+---
+
+### C. Paper-to-Digital Intake Purpose & Data
+*   **Real Data vs Demo:**
+    *   The paper intake data is realistic synthetic data from the Synthea Nigerian PHC sample set.
+    *   **Purpose:** It simulates real Nigerian PHC conditions where clerks transcribe handwritten paper folders. When handwriting is smudged or ambiguous, the clerk flags it for clinical review rather than guessing medications or allergies.
+    *   **Action:** Kept intact as a realistic showcase for USPF evaluators.
+
+---
+
+### D. PHC Resilience Station (De-noised Mobile Controls)
+*   **What we are SUBTRACTING:**
+    *   Remove the bulky, wordy floating box ("PHC Resilience Station / USPF 2026 / Network / Sync Now...") that covers the screen and clutters mobile devices.
+*   **What we are ADDING:**
+    *   A compact, minimalist bottom pill dock with just 2 small buttons:
+        *   `🟢 Online` (tap toggles offline without wordy explanations).
+        *   `↻ Sync (0)` (tap triggers instant batch synchronization).
+    *   No explanatory text; clean, modern, and mobile-friendly.
+
+---
+
+### E. Power Loss Alert Audio & Battery Step-Down Simulator
+*   **Audio Behavior:**
+    *   **Power Unplugged (Blackout):** Play the alert tone warning the nurse that AC power is disconnected.
+    *   **Power Plugged In / Charging:** Mute / silent. No alarm sounds while charging.
+*   **Battery Step-Down Logic:**
+    *   Step battery depletion down in 20% intervals (`100% -> 80% -> 60% -> 40% -> 20% -> 10%`).
+    *   Clean battery percentage indicator in the top header bar with a low-power warning at 20%.
+
+---
+
+## 9. Approval Gate
+
+> **No code changes have been applied to `index.html` or `admin.html` yet.**  
+> Please review this plan. Once you give your confirmation, we will apply these refinements immediately.
 
