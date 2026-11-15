@@ -1,4 +1,5 @@
 import os
+import uuid
 import hashlib
 from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
@@ -46,33 +47,57 @@ class PatientRegistrationRequest(BaseModel):
     gender: str
     age: int
     folder_number: str
-    condition: Optional[str] = "Primary Care Outpatient"
+    condition: Optional[str] = "General Clinic"
     blood_group: Optional[str] = "Unknown"
     genotype: Optional[str] = "Unknown"
     phone: Optional[str] = ""
     nin: Optional[str] = ""
     bhcpf_id: Optional[str] = ""
     allergies: Optional[str] = "None reported"
-    is_paper_migration: bool = False
-    flagged_for_review: bool = False
+    is_new_digital: Optional[bool] = False
+    is_paper_migration: Optional[bool] = False
+    flagged_for_review: Optional[bool] = False
     review_notes: Optional[str] = ""
 
 class EncounterRequest(BaseModel):
     patient_id: str
-    encounter_type: str = "General Outpatient"
+    encounter_type: Optional[str] = "General Clinic"
+    history_complaint: Optional[str] = ""
+    physical_exam: Optional[str] = ""
     bp: Optional[str] = "120/80"
     temperature: Optional[float] = 36.8
     pulse: Optional[int] = 76
     weight: Optional[float] = 60.0
-    rdt_result: Optional[str] = "Not Tested"
-    clinical_assessment: str
+    blood_sugar: Optional[float] = None
+    investigations: Optional[str] = ""
+    primary_diagnosis: Optional[str] = ""
+    differential_diagnosis: Optional[str] = ""
     prescription: Optional[str] = ""
+    outcome: Optional[str] = "Give Drugs & Go Home"
+    followup_date: Optional[str] = ""
+    # backwards compatibility:
+    rdt_result: Optional[str] = None
+    clinical_assessment: Optional[str] = None
+
+class AdmissionCreateRequest(BaseModel):
+    patient_id: str
+    bed_number: Optional[str] = "Observation Bed 01"
+    admission_reason: str
+    initial_notes: Optional[str] = ""
+
+class AdmissionNoteRequest(BaseModel):
+    note_text: str
+
+class AdmissionDischargeRequest(BaseModel):
+    discharge_summary: str
+    discharge_outcome: Optional[str] = "Discharged Home"
 
 class ReferralCreateRequest(BaseModel):
     patient_id: str
     destination_facility: str
     reason: str
-    urgency: str = "Routine"
+    urgency: Optional[str] = "Routine"
+    transfer_vitals: Optional[str] = ""
 
 class ReferralStatusUpdateRequest(BaseModel):
     status: str
@@ -92,6 +117,7 @@ class BatchSyncRequest(BaseModel):
     encounters: List[Dict[str, Any]] = []
     notes: List[Dict[str, Any]] = []
     referrals: List[Dict[str, Any]] = []
+    admissions: List[Dict[str, Any]] = []
 
 class ThreatReportRequest(BaseModel):
     patient_id: str
@@ -249,97 +275,262 @@ async def get_patient_chart(patient_id: str, user: dict = Depends(get_current_us
             patient_id
         )
 
+        # Fetch short-stay admissions
+        admissions = await conn.fetch(
+            "SELECT * FROM short_stay_admissions WHERE patient_id = $1 ORDER BY admitted_at DESC",
+            patient_id
+        )
+
         # Fetch paper intake status if any
         intake = await conn.fetchrow(
             "SELECT * FROM paper_intakes WHERE patient_id = $1 ORDER BY id DESC LIMIT 1",
             patient_id
         )
 
-        audit_entry = await log_access_event(staff_id, "PATIENT_CHART_ACCESSED", patient_id, "Outpatient clinical review")
+        # Build chronological vitals history (Past Visit Readings)
+        vitals_history = []
+        for e in encounters:
+            if e.get("bp") or e.get("temperature") or e.get("pulse"):
+                vitals_history.append({
+                    "timestamp": str(e.get("timestamp", ""))[:16],
+                    "bp": e.get("bp") or "—",
+                    "temperature": e.get("temperature"),
+                    "pulse": e.get("pulse"),
+                    "weight": e.get("weight"),
+                    "blood_sugar": e.get("blood_sugar"),
+                    "encounter_type": e.get("encounter_type", "General Clinic"),
+                    "diagnosis": e.get("primary_diagnosis") or e.get("clinical_assessment") or "Clinical Review"
+                })
+
+        audit_entry = await log_access_event(staff_id, "PATIENT_CHART_ACCESSED", patient_id, "PHC clinical clerkship review")
 
         return {
             "patient": dict(patient),
             "encounters": [dict(e) for e in encounters],
+            "vitals_history": vitals_history,
+            "admissions": [dict(a) for a in admissions],
             "clinical_notes": [dict(n) for n in notes],
             "referrals": [dict(r) for r in referrals],
             "paper_intake": dict(intake) if intake else None,
             "audit": audit_entry
         }
 
-# --- PATIENT REGISTRATION & PAPER INTAKE ---
+# --- PATIENT REGISTRATION & STAGED PAPER MIGRATION ---
 @app.post("/api/patients/register")
 async def register_patient(req: PatientRegistrationRequest, user: dict = Depends(get_current_user)):
     staff_id = user["sub"]
     full_name = f"{req.first.strip()} {req.last.strip()}"
-    new_patient_id = f"PHC-PT-{datetime.now().strftime('%m%d%H%M%S')}"
+    new_patient_id = f"PHC-PT-{datetime.now().strftime('%m%d%H%M%S')}-{uuid.uuid4().hex[:4].upper()}"
+
+    is_new = 1 if req.is_new_digital else 0
+    has_paper = 0 if req.is_new_digital else 1
 
     async with db.legacy_pool.acquire() as conn:
         await conn.execute(
             """INSERT INTO patients (
                 id, first, last, name, age, gender, organization, ward_id, condition,
-                blood_group, genotype, phone, nin, bhcpf_id, allergies
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)""",
+                blood_group, genotype, phone, nin, bhcpf_id, allergies, is_new_digital, has_paper_folder
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)""",
             new_patient_id, req.first, req.last, full_name, req.age, req.gender,
             user.get("org", "Alakia PHC"), req.folder_number, req.condition,
-            req.blood_group, req.genotype, req.phone, req.nin, req.bhcpf_id, req.allergies
+            req.blood_group, req.genotype, req.phone, req.nin, req.bhcpf_id, req.allergies,
+            is_new, has_paper
         )
 
-        if req.is_paper_migration:
+        if req.is_paper_migration or not req.is_new_digital:
             await conn.execute(
                 """INSERT INTO paper_intakes (
                     patient_id, folder_number, transcribed_by, flagged_for_review, review_notes
                 ) VALUES ($1, $2, $3, $4, $5)""",
-                new_patient_id, req.folder_number, staff_id, req.flagged_for_review, req.review_notes
+                new_patient_id, req.folder_number, staff_id,
+                1 if req.flagged_for_review else 0, req.review_notes or ""
             )
-            action_name = "PAPER_FOLDER_TRANSCRIBED_REVIEW_REQUIRED" if req.flagged_for_review else "PAPER_FOLDER_MIGRATED"
+            action_name = "PAPER_FOLDER_TRANSCRIBED_REVIEW_REQUIRED" if req.flagged_for_review else "PAPER_FOLDER_PARALLEL_MIGRATED"
             await log_access_event(staff_id, action_name, new_patient_id, f"Folder: {req.folder_number}")
         else:
-            await log_access_event(staff_id, "NEW_PATIENT_REGISTERED", new_patient_id, f"Folder: {req.folder_number}")
+            await log_access_event(staff_id, "NEW_DIGITAL_PATIENT_REGISTERED", new_patient_id, f"Folder: {req.folder_number}")
 
         return {
             "status": "success",
             "patient_id": new_patient_id,
             "folder_number": req.folder_number,
-            "message": "Patient record registered successfully."
+            "message": "Patient record registered successfully in WardVault."
         }
 
-# --- OUTPATIENT CLINICAL ENCOUNTER ---
+# --- PAPER-MIRRORING CLINICAL ENCOUNTER ---
 @app.post("/api/encounters")
 async def record_encounter(req: EncounterRequest, user: dict = Depends(get_current_user)):
     staff_id = user["sub"]
     if not user.get("on_duty", False):
         raise HTTPException(status_code=403, detail="You are currently OFF DUTY.")
 
+    history = (req.history_complaint or req.clinical_assessment or "").strip()
+    primary_diag = (req.primary_diagnosis or req.clinical_assessment or "Clinical Review").strip()
+    diff_diag = (req.differential_diagnosis or "").strip()
+    investigations = (req.investigations or (f"RDT: {req.rdt_result}" if req.rdt_result else "")).strip()
+    prescription = (req.prescription or "").strip()
+    outcome = (req.outcome or "Give Drugs & Go Home").strip()
+
     async with db.legacy_pool.acquire() as conn:
         enc_id = await conn.fetchval(
             """INSERT INTO clinical_encounters (
-                patient_id, provider_id, encounter_type, bp, temperature, pulse, weight,
-                rdt_result, clinical_assessment, prescription
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id""",
-            req.patient_id, staff_id, req.encounter_type, req.bp, req.temperature,
-            req.pulse, req.weight, req.rdt_result, req.clinical_assessment, req.prescription
+                patient_id, provider_id, encounter_type, history_complaint, physical_exam,
+                bp, temperature, pulse, weight, blood_sugar, investigations,
+                primary_diagnosis, differential_diagnosis, prescription, outcome, followup_date
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id""",
+            req.patient_id, staff_id, req.encounter_type, history, req.physical_exam,
+            req.bp, req.temperature, req.pulse, req.weight, req.blood_sugar, investigations,
+            primary_diag, diff_diag, prescription, outcome, req.followup_date
         )
+
+        auto_adm_id = None
+        if "Admit" in outcome:
+            existing_adm = await conn.fetchrow(
+                "SELECT id FROM short_stay_admissions WHERE patient_id = $1 AND status = 'Active'",
+                req.patient_id
+            )
+            if not existing_adm:
+                auto_adm_id = await conn.fetchval(
+                    """INSERT INTO short_stay_admissions (
+                        patient_id, provider_id, bed_number, admission_reason, status, daily_ward_notes
+                    ) VALUES ($1, $2, 'Observation Bed 01', $3, 'Active', $4) RETURNING id""",
+                    req.patient_id, staff_id,
+                    f"Admitted following consultation: {primary_diag}",
+                    f"Admission orders: {prescription}"
+                )
 
         await log_access_event(
             staff_id,
             "CLINICAL_ENCOUNTER_RECORDED",
             req.patient_id,
-            f"Encounter #{enc_id} ({req.encounter_type})"
+            f"Encounter #{enc_id} ({req.encounter_type}) - Outcome: {outcome}"
         )
 
-        return {"status": "success", "encounter_id": enc_id}
+        return {
+            "status": "success",
+            "encounter_id": enc_id,
+            "auto_admission_id": auto_adm_id,
+            "message": "Consultation saved to digital medical record."
+        }
 
-# --- REFERRALS & FOLLOW-UP ---
+# --- SHORT-STAY OBSERVATION WARD (1 TO 3 DAYS) ---
+@app.get("/api/admissions/active")
+async def get_active_admissions(user: dict = Depends(get_current_user)):
+    async with db.legacy_pool.acquire() as conn:
+        admissions = await conn.fetch("""
+            SELECT a.id, a.patient_id, a.provider_id, a.bed_number, a.admission_reason,
+                   a.admitted_at, a.discharged_at, a.status, a.daily_ward_notes, a.discharge_summary,
+                   p.name as patient_name, p.age, p.gender, p.ward_id as folder_number, p.phone,
+                   pr.name as provider_name
+            FROM short_stay_admissions a
+            LEFT JOIN patients p ON a.patient_id = p.id
+            LEFT JOIN providers pr ON a.provider_id = pr.id
+            WHERE a.status = 'Active'
+            ORDER BY a.admitted_at DESC
+        """)
+        return [dict(a) for a in admissions]
+
+@app.get("/api/admissions")
+async def get_all_admissions(user: dict = Depends(get_current_user)):
+    async with db.legacy_pool.acquire() as conn:
+        admissions = await conn.fetch("""
+            SELECT a.id, a.patient_id, a.provider_id, a.bed_number, a.admission_reason,
+                   a.admitted_at, a.discharged_at, a.status, a.daily_ward_notes, a.discharge_summary,
+                   p.name as patient_name, p.age, p.gender, p.ward_id as folder_number,
+                   pr.name as provider_name
+            FROM short_stay_admissions a
+            LEFT JOIN patients p ON a.patient_id = p.id
+            LEFT JOIN providers pr ON a.provider_id = pr.id
+            ORDER BY a.admitted_at DESC
+        """)
+        return [dict(a) for a in admissions]
+
+@app.post("/api/admissions")
+async def admit_patient(req: AdmissionCreateRequest, user: dict = Depends(get_current_user)):
+    staff_id = user["sub"]
+    if not user.get("on_duty", False):
+        raise HTTPException(status_code=403, detail="You are currently OFF DUTY.")
+
+    async with db.legacy_pool.acquire() as conn:
+        adm_id = await conn.fetchval(
+            """INSERT INTO short_stay_admissions (
+                patient_id, provider_id, bed_number, admission_reason, status, daily_ward_notes
+            ) VALUES ($1, $2, $3, $4, 'Active', $5) RETURNING id""",
+            req.patient_id, staff_id, req.bed_number or "Observation Bed 01", req.admission_reason,
+            f"Admitted by {user.get('name', staff_id)}. Initial note: {req.initial_notes}" if req.initial_notes else f"Admitted by {user.get('name', staff_id)}."
+        )
+        await log_access_event(
+            staff_id,
+            "PATIENT_ADMITTED_OBSERVATION",
+            req.patient_id,
+            f"Admitted to {req.bed_number}: {req.admission_reason[:60]}"
+        )
+        return {"status": "success", "admission_id": adm_id, "bed_number": req.bed_number}
+
+@app.post("/api/admissions/{admission_id}/notes")
+async def add_admission_ward_note(admission_id: int, req: AdmissionNoteRequest, user: dict = Depends(get_current_user)):
+    staff_id = user["sub"]
+    author_name = user.get("name", staff_id)
+    timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    async with db.legacy_pool.acquire() as conn:
+        adm = await conn.fetchrow("SELECT * FROM short_stay_admissions WHERE id = $1", admission_id)
+        if not adm:
+            raise HTTPException(status_code=404, detail="Admission record not found.")
+
+        existing_notes = adm.get("daily_ward_notes") or ""
+        new_entry = f"\n[{timestamp_str} - {author_name}]: {req.note_text.strip()}"
+        updated_notes = (existing_notes + new_entry).strip()
+
+        await conn.execute(
+            "UPDATE short_stay_admissions SET daily_ward_notes = $1 WHERE id = $2",
+            updated_notes, admission_id
+        )
+
+        await log_access_event(
+            staff_id,
+            "ADMISSION_WARD_NOTE_ADDED",
+            adm["patient_id"],
+            f"Progress note for Bed {adm['bed_number']}"
+        )
+        return {"status": "success", "daily_ward_notes": updated_notes}
+
+@app.patch("/api/admissions/{admission_id}/discharge")
+async def discharge_admission(admission_id: int, req: AdmissionDischargeRequest, user: dict = Depends(get_current_user)):
+    staff_id = user["sub"]
+    async with db.legacy_pool.acquire() as conn:
+        adm = await conn.fetchrow("SELECT * FROM short_stay_admissions WHERE id = $1", admission_id)
+        if not adm:
+            raise HTTPException(status_code=404, detail="Admission record not found.")
+
+        summary_text = f"[{req.discharge_outcome}] {req.discharge_summary}"
+        await conn.execute(
+            """UPDATE short_stay_admissions
+               SET status = 'Discharged', discharged_at = CURRENT_TIMESTAMP, discharge_summary = $1
+               WHERE id = $2""",
+            summary_text, admission_id
+        )
+
+        await log_access_event(
+            staff_id,
+            "PATIENT_DISCHARGED_OBSERVATION",
+            adm["patient_id"],
+            f"Discharged from {adm['bed_number']}: {req.discharge_outcome}"
+        )
+        return {"status": "success", "message": f"Patient discharged from {adm['bed_number']}"}
+
+# --- REFERRALS & PRINTABLE SECONDARY TRANSFER SLIPS ---
 @app.get("/api/referrals")
 async def get_referrals(user: dict = Depends(get_current_user)):
     async with db.legacy_pool.acquire() as conn:
         refs = await conn.fetch("""
             SELECT r.id, r.patient_id, r.referred_by, r.destination_facility, r.reason,
-                   r.urgency, r.status, r.created_at, r.updated_at,
+                   r.urgency, r.status, r.transfer_vitals, r.counter_referral_notes,
+                   r.created_at, r.updated_at,
                    p.name as patient_name, p.ward_id as folder_number, pr.name as staff_name
             FROM referrals r
             LEFT JOIN patients p ON r.patient_id = p.id
-            LEFT JOIN providers pr ON r.referred_by = pr.id
+            LEFT JOIN providers pr ON (r.referred_by = pr.id OR r.provider_id = pr.id)
             ORDER BY r.id DESC
         """)
         return [
@@ -353,12 +544,127 @@ async def get_referrals(user: dict = Depends(get_current_user)):
                 "reason": r["reason"],
                 "urgency": r["urgency"],
                 "status": r["status"],
+                "transfer_vitals": r.get("transfer_vitals") or "",
+                "counter_referral_notes": r.get("counter_referral_notes") or "",
                 "created_at": str(r["created_at"]),
                 "updated_at": str(r["updated_at"])
             }
             for r in refs
         ]
 
+@app.post("/api/referrals")
+async def create_referral(req: ReferralCreateRequest, user: dict = Depends(get_current_user)):
+    staff_id = user["sub"]
+    if not user.get("on_duty", False):
+        raise HTTPException(status_code=403, detail="You are currently OFF DUTY.")
+
+    async with db.legacy_pool.acquire() as conn:
+        ref_id = await conn.fetchval(
+            """INSERT INTO referrals (
+                patient_id, referred_by, provider_id, destination_facility, reason, urgency, transfer_vitals, status
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'Referred') RETURNING id""",
+            req.patient_id, staff_id, staff_id, req.destination_facility, req.reason, req.urgency, req.transfer_vitals or ""
+        )
+
+        await log_access_event(
+            staff_id,
+            "REFERRAL_ISSUED",
+            req.patient_id,
+            f"Referral #{ref_id} to {req.destination_facility} ({req.urgency})"
+        )
+
+        return {"status": "success", "referral_id": ref_id}
+
+@app.get("/api/referrals/{referral_id}/slip")
+async def get_referral_transfer_slip(referral_id: int, user: dict = Depends(get_current_user)):
+    async with db.legacy_pool.acquire() as conn:
+        ref = await conn.fetchrow("""
+            SELECT r.*, p.name as patient_name, p.age, p.gender, p.ward_id as folder_number,
+                   p.blood_group, p.genotype, p.allergies, p.phone, p.nin, p.bhcpf_id,
+                   pr.name as referrer_name, pr.speciality as referrer_role
+            FROM referrals r
+            LEFT JOIN patients p ON r.patient_id = p.id
+            LEFT JOIN providers pr ON (r.referred_by = pr.id OR r.provider_id = pr.id)
+            WHERE r.id = $1
+        """, referral_id)
+        if not ref:
+            raise HTTPException(status_code=404, detail="Referral record not found.")
+
+        latest_enc = await conn.fetchrow("""
+            SELECT * FROM clinical_encounters WHERE patient_id = $1 ORDER BY timestamp DESC LIMIT 1
+        """, ref["patient_id"])
+
+        ref_sig_payload = f"{ref['id']}-{ref['patient_id']}"
+        ref_sig_hash = hashlib.sha256(ref_sig_payload.encode()).hexdigest()[:16].upper()
+
+        slip = {
+            "slip_number": f"WV-REF-2026-{ref['id']:04d}",
+            "referral_id": ref["id"],
+            "date": str(ref["created_at"])[:19],
+            "facility_origin": {
+                "name": "Alakia Primary Healthcare Centre",
+                "ward": "Ward 4, Egbeda Local Government Area",
+                "state": "Oyo State, Nigeria",
+                "type": "Primary Healthcare Centre (PHC) Tier 1",
+                "moh_code": "OY/EGB/PHC-04"
+            },
+            "destination_facility": ref["destination_facility"],
+            "urgency": ref["urgency"],
+            "status": ref["status"],
+            "patient": {
+                "id": ref["patient_id"],
+                "name": ref.get("patient_name") or "Unknown",
+                "folder_number": ref.get("folder_number") or ref["patient_id"],
+                "age": ref.get("age"),
+                "gender": ref.get("gender"),
+                "phone": ref.get("phone") or "N/A",
+                "nin": ref.get("nin") or "N/A",
+                "bhcpf_id": ref.get("bhcpf_id") or "N/A",
+                "blood_group": ref.get("blood_group") or "O+",
+                "genotype": ref.get("genotype") or "AA",
+                "allergies": ref.get("allergies") or "None reported"
+            },
+            "clinical": {
+                "clinical_reason": ref["reason"],
+                "transfer_vitals": ref.get("transfer_vitals") or (
+                    f"BP: {latest_enc['bp']}, Temp: {latest_enc['temperature']}°C, Pulse: {latest_enc['pulse']} bpm" if latest_enc else "Recorded at departure"
+                ),
+                "provisional_diagnosis": latest_enc.get("primary_diagnosis") if latest_enc else "Acute Clinical Transfer",
+                "emergency_treatment_given": latest_enc.get("prescription") if latest_enc else "Immediate stabilization provided",
+                "counter_referral_notes": ref.get("counter_referral_notes") or ""
+            },
+            "referred_by": {
+                "name": ref.get("referrer_name") or ref.get("referred_by") or "Officer on Duty",
+                "role": ref.get("referrer_role") or "Registered Nurse / CHEW",
+                "signature_seal": f"WARDVAULT-DIGITAL-SIGNATURE-SHA256-{ref_sig_hash}"
+            }
+        }
+        return slip
+
+@app.patch("/api/referrals/{referral_id}/status")
+async def update_referral_status(referral_id: int, req: ReferralStatusUpdateRequest, user: dict = Depends(get_current_user)):
+    staff_id = user["sub"]
+
+    async with db.legacy_pool.acquire() as conn:
+        ref = await conn.fetchrow("SELECT * FROM referrals WHERE id = $1", referral_id)
+        if not ref:
+            raise HTTPException(status_code=404, detail="Referral record not found.")
+
+        await conn.execute(
+            "UPDATE referrals SET status = $1, counter_referral_notes = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3",
+            req.status, req.notes or "", referral_id
+        )
+
+        await log_access_event(
+            staff_id,
+            "REFERRAL_STATUS_UPDATED",
+            ref["patient_id"],
+            f"Referral #{referral_id} updated to '{req.status}'"
+        )
+
+        return {"status": "success", "message": f"Referral status updated to {req.status}"}
+
+# --- PAPER INTAKE AUDIT & RESOLUTION ---
 @app.get("/api/paper-intakes/flagged")
 async def get_flagged_paper_intakes(user: dict = Depends(get_current_user)):
     async with db.legacy_pool.acquire() as conn:
@@ -396,12 +702,14 @@ async def resolve_paper_intake(intake_id: int, user: dict = Depends(get_current_
         await log_access_event(staff_id, "PAPER_FOLDER_REVIEW_RESOLVED", intake["patient_id"], f"Resolved clinical review for Folder #{intake['folder_number']}")
         return {"status": "success", "message": f"Folder #{intake['folder_number']} verified and cleared for clinical care."}
 
+# --- FACILITY METRICS & DASHBOARD ---
 @app.get("/api/metrics")
 async def get_facility_metrics():
     async with db.legacy_pool.acquire() as conn:
         pat_count = await conn.fetchval("SELECT count(*) FROM patients")
         enc_count = await conn.fetchval("SELECT count(*) FROM clinical_encounters")
         ref_count = await conn.fetchval("SELECT count(*) FROM referrals WHERE status != 'Completed'")
+        active_adm_count = await conn.fetchval("SELECT count(*) FROM short_stay_admissions WHERE status = 'Active'")
         flagged_count = await conn.fetchval("SELECT count(*) FROM paper_intakes WHERE flagged_for_review = 1")
     async with db.audit_pool.acquire() as conn:
         block_count = await conn.fetchval("SELECT count(*) FROM audit_log")
@@ -409,55 +717,10 @@ async def get_facility_metrics():
         "active_patients": pat_count or 0,
         "clinical_encounters": enc_count or 0,
         "active_referrals": ref_count or 0,
+        "active_admissions": active_adm_count or 0,
         "flagged_folders": flagged_count or 0,
         "audit_blocks": block_count or 0
     }
-
-@app.post("/api/referrals")
-async def create_referral(req: ReferralCreateRequest, user: dict = Depends(get_current_user)):
-    staff_id = user["sub"]
-    if not user.get("on_duty", False):
-        raise HTTPException(status_code=403, detail="You are currently OFF DUTY.")
-
-    async with db.legacy_pool.acquire() as conn:
-        ref_id = await conn.fetchval(
-            """INSERT INTO referrals (
-                patient_id, referred_by, destination_facility, reason, urgency, status
-            ) VALUES ($1, $2, $3, $4, $5, 'Referred') RETURNING id""",
-            req.patient_id, staff_id, req.destination_facility, req.reason, req.urgency
-        )
-
-        await log_access_event(
-            staff_id,
-            "REFERRAL_ISSUED",
-            req.patient_id,
-            f"Referral #{ref_id} to {req.destination_facility} ({req.urgency})"
-        )
-
-        return {"status": "success", "referral_id": ref_id}
-
-@app.patch("/api/referrals/{referral_id}/status")
-async def update_referral_status(referral_id: int, req: ReferralStatusUpdateRequest, user: dict = Depends(get_current_user)):
-    staff_id = user["sub"]
-
-    async with db.legacy_pool.acquire() as conn:
-        ref = await conn.fetchrow("SELECT * FROM referrals WHERE id = $1", referral_id)
-        if not ref:
-            raise HTTPException(status_code=404, detail="Referral record not found.")
-
-        await conn.execute(
-            "UPDATE referrals SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
-            req.status, referral_id
-        )
-
-        await log_access_event(
-            staff_id,
-            "REFERRAL_STATUS_UPDATED",
-            ref["patient_id"],
-            f"Referral #{referral_id} updated to '{req.status}'"
-        )
-
-        return {"status": "success", "message": f"Referral status updated to {req.status}"}
 
 # --- CLINICAL NOTES (APPEND-ONLY) ---
 @app.post("/api/records/notes")

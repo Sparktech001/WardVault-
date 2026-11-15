@@ -1,196 +1,181 @@
-# WardVault: USPF Changemaker Challenge Strategic Implementation Plan
+# WardVault: 12-Hour PHC Implementation MVP Plan
+## Implementation-Ready Patient Records & Care-Coordination Platform for Underserved Nigerian PHCs
 
-**Target Track:** Healthcare Innovation for Underserved Communities  
-**Product Positioning:** *Offline-First Patient Records & Care-Coordination Platform for Primary Healthcare Centres (PHCs)*  
-**Author:** Pair Programming Strategy Team  
-**Status:** Awaiting User Confirmation & Approval (No Code Changes Applied Yet)
+**Target Track:** USPF Changemaker Challenge 2026 (Track C: Healthcare Innovation)  
+**Target Setting:** Underserved Primary Healthcare Centres (PHCs) across Nigeria  
+**Product Framing:** Implementation-Ready MVP (Designed for real clinical adoption, not an abstract prototype)  
+**Status:** **AWAITING USER CONFIRMATION & APPROVAL (No code changes applied yet)**  
 
 ---
 
-## 1. Executive Summary & Deployment Feasibility
+## 1. Executive Summary & Synthesis of Team Review
 
-### Yes, We Can Make It Work and Deploy It!
-**Yes, 100%.** Not only will we make the local application fully functional, but we will also prepare it for **dual deployment**:
+Following the team lead, panel, and speaker review, WardVault is being tailored specifically for **Nigerian Primary Healthcare Centre reality**. 
+
+PHC nurses and Community Health Extension Workers (CHEWs) do not use tertiary hospital electronic systems; they work with **standard paper folders**, face frequent power outages, handle **short-stay admissions (1–3 days)** for acute illnesses like severe malaria, and require **plain, intuitive everyday language** rather than developer jargon or AI-sounding buzzwords.
+
+---
+
+## 2. Plain Language UI Dictionary (Removing Technical Jargon)
+
+To ensure nurses, CHEWs, and records officers feel immediately at home, all academic and tertiary hospital jargon will be replaced with plain, practical clinic words:
+
+| Jargon to REMOVE | Plain Language Replacement | Why the Change Matters |
+| :--- | :--- | :--- |
+| **OPD / Outpatient** | **General Clinic** or **Daily Patients** | PHC staff and patients call general consultations the "General Clinic". |
+| **Longitudinal Vitals** | **Past Visit Readings** | Plain description of previous blood pressure and temperature checks. |
+| **Paper Migration Review Queue** | **Register Existing Paper Folder** | Clear action for entering an old physical folder into the system. |
+| **ABAC Policy Restriction** | **Staff Member Off-Duty** | Clean notice explaining that staff must be on shift to access records. |
+| **Triage Encounter** | **Patient Consultation** | Mirrors the physical consultation room. |
+| **Chief Complaint** | **What brought the patient today?** | Natural medical interview question used in primary care clerkship. |
+| **Cryptographic Hash Proof** | **Verified Clinic Record ✓** | Assures staff the record is locked and tamper-evident without confusing math terms. |
+
+---
+
+## 3. The 10 Real-World Sample Patients (Curated MVP Cohort)
+
+The 100+ generic synthetic entries (`FL-1000` series) will be completely replaced with **10 realistic, diverse clinical cases** based on daily Nigerian PHC practice:
+
+| # | Patient Name | Age / Sex | Clinic Folder # | Clinical Story & Management |
+| :- | :--- | :--- | :--- | :--- |
+| **1** | **Amina Garba** | 26 / F | **ANC-2026-01** | **Pregnancy & Delivery (ANC):** 32 weeks pregnant. Normal blood pressure (115/75), fundal height matches dates. Given Iron/Folic acid and second dose of Fansidar (IPTp) to prevent malaria. Booked for next check in 2 weeks. |
+| **2** | **Baby Kazeem Adeleke** | 6 wks / M | **EPI-2026-02** | **Newborn Immunization:** 6-week routine immunization visit. Received Pentavalent 1, Oral Polio 1, PCV 1, and Rotavirus 1. Weight: 4.3kg. Mother counseled on exclusive breastfeeding. |
+| **3** | **Joy Okafor** | 34 / F | **GEN-2026-03** | **HIV Regular Drug Pickup:** Known HIV patient doing well on TLD daily tablets. Undetectable viral load. Given 3-month drug refill, checked for side effects, adherence confirmed. |
+| **4** | **Usman Danladi** | 42 / M | **GEN-2026-04** | **Tuberculosis (TB) Care:** Coughing for over 3 weeks with night sweats and weight loss. Sputum test ordered; started on standard 4-drug Anti-TB fixed-dose combination (RHZE). Contact tracing initiated. |
+| **5** | **Tunde Balogun** | 19 / M | **GEN-2026-05** | **Severe Malaria (Admitted for 2 Days):** Arrived with high fever (39.5°C), vomiting, and extreme weakness. Rapid malaria test positive. **Admitted to Observation Ward** for IV Artesunate and IV fluids for 36 hours. Recovered, completed oral ACT, and discharged home. |
+| **6** | **Blessing Adeleke** | 29 / F | **GEN-2026-06** | **Depression / Mental Health:** Mother of young child presenting with 2 months of constant crying, exhaustion, lack of sleep, and feelings of hopelessness. Screened with PHQ-9 (moderate depression). Given supportive counseling and scheduled for weekly support. |
+| **7** | **Musa Ibrahim** | 35 / M | **ORTHO-2026-07** | **Orthopedic / Bone Injury (Referral):** Okada motorcycle rider involved in a crash. Broken right lower leg bone (closed tibia fracture). Leg splinted, given pain relief, and given an **Emergency Secondary Transfer Slip to UCH Ibadan**. |
+| **8** | **Chief Samuel Adele** | 58 / M | **CHRONIC-2026-08** | **High Blood Pressure & Diabetes:** Long-standing hypertension. Today's BP: 155/95 mmHg. Fasting blood sugar: 180 mg/dL. Past visit readings show gradual improvement. Refilled Amlodipine 10mg and Metformin 500mg. Counseled on salt reduction. |
+| **9** | **Baby Aisha Bello** | 14 mos / F | **EPI-2026-09** | **Child Malnutrition & Diarrhea:** Weak toddler with watery stool. Arm tape check (MUAC) shows 11.2 cm (Red - Severe Wasting). Started immediately on ORS, Zinc, and Plumpy'Nut (RUTF paste). |
+| **10** | **Emmanuel Chukwu** | 7 yrs / M | **GEN-2026-10** | **Routine Child Health & Deworming:** Healthy primary school boy. Given Albendazole 400mg tablet to clear stomach worms and Vitamin A capsule for healthy eyes. |
+
+---
+
+## 4. Consultation Flow: Following the Physical Paper Folder
+
+The consultation screen will be structured in the exact step-by-step order of the standard physical paper clerkship:
 
 ```
-[Local PHC Facility Deployment (Offline LAN)]
-  CHEW Tablet (Wi-Fi) -----\
-  Nurse Laptop (LAN) -------> [ PHC Gateway (Local Laptop/Mini-PC) ]
-                                    |
-                            [ Encrypted Local SQLite DB ]
-                            [ Pending Sync Queue ]
-                                    | (Auto-Sync when Internet/Cellular returns)
-                                    v
-[Cloud Live Deployment (Render/Railway/Vercel)]
-  Remote Judges / Web Evaluators ---> [ WardVault Cloud Gateway & Central Ledger ]
+[ Step 1: PATIENT HISTORY ]
+  - What brought the patient today? (Main complaint & duration, e.g. "3 days of hot body and shivering")
+  - Details of illness (History of Presenting Complaint)
+  - Past medical history, current drugs, and allergies
+
+[ Step 2: PHYSICAL EXAMINATION ]
+  - Today's Vital Signs (Blood pressure, Temperature, Pulse, Weight)
+  - Physical Observations (Pallor/pale eyes, dehydration, swollen feet, chest sounds, abdomen)
+
+[ Step 3: TESTS & INVESTIGATIONS ]
+  - Point-of-care clinic tests:
+    * Malaria Rapid Test (mRDT): Negative / Positive
+    * Sputum Test for TB
+    * HIV Rapid Screening
+    * Urinalysis & Blood Sugar test
+
+[ Step 4: DIAGNOSIS ]
+  - Main Diagnosis (e.g., Severe Malaria, Gestational Anemia, Bone Fracture)
+  - Other possible conditions (Differential diagnoses)
+
+[ Step 5: TREATMENT & PRESCRIPTION (Rx) ]
+  - Prescribe medicines (Drug name, dose, times per day, how many days)
+  - Pharmacy dispensing notes
+
+[ Step 6: CONSULTATION OUTCOME ]
+  1. Give Drugs & Go Home (Outpatient discharge)
+  2. Order Tests & Return (Wait for clinic lab results today)
+  3. Book Next Visit (e.g., return in 2 weeks for BP check or 3 months for HIV drugs)
+  4. ADMIT TO OBSERVATION WARD (1 to 3 Days short-stay admission)
+  5. TRANSFER PATIENT (Secondary Referral to General Hospital / Teaching Hospital)
 ```
 
-1. **Live Web Deployment (Cloud):** Deployed to Render / Railway / Vercel so the USPF judging panel, partners, and team members can test the system immediately in any browser with zero setup.
-2. **Local Facility Deployment (Offline LAN):** Packaged to run on an inexpensive facility laptop or mini-PC acting as the local server over a basic Wi-Fi router, providing complete offline capability across tablets without needing internet access.
+---
+
+## 5. Short-Stay Admission Flow (1 to 3 Days)
+
+Primary healthcare centres do not have large surgical wards, but they **routinely admit patients for 1 to 3 days** (Observation Beds) for:
+- Severe malaria on IV Artesunate / drips
+- Dehydrated children receiving IV/oral rehydration
+- Women in early labor / post-delivery observation (24 hours)
+
+### How the Admission Flow Works:
+1. **Admit Action:** Clinician selects **"Admit to Observation Ward (1–3 Days)"**, chooses an observation bed (e.g. Bed 02), and notes admission reason.
+2. **Observation Ward List:** A dedicated tab shows currently admitted patients in the facility with their length of stay (e.g. *Tunde Balogun • Admitted 24 hrs ago • Bed 02*).
+3. **Daily Ward Notes:** Nurses log daily progress notes and morning/evening vitals without having to register a whole new patient.
+4. **Resolution:** Clinician selects either:
+   - **Discharge Home** (condition resolved, switch to oral tablets)
+   - **Transfer to General Hospital** (patient not improving, escalate referral).
 
 ---
 
-## 2. Competitive Alignment (Why WardVault Wins)
+## 6. Past Visit Readings (Blood Pressure & Vitals History)
 
-The 2026 NITDA & NBS Tech Outlook Report reveals that **only 16.2% of Nigerian PHCs have working internet**, and **only 26.4% keep electronic records**. 
+When a returning patient is opened in the consultation room, the clinician sees all previous visit readings arranged together chronologically:
 
-| Dimension | Helium Health | OpenMRS | **WardVault (Proposed)** |
-| :--- | :--- | :--- | :--- |
-| **Target Setting** | Large private/tertiary hospitals | General low-resource clinics | **Individual Underserved PHCs** |
-| **Offline Reality** | Cloud-dependent ecosystem | Requires heavy server infrastructure | **Lightweight local LAN + IndexedDB queue** |
-| **Paper Migration** | Software only; facility must solve | Self-managed / custom | **Managed Paper-to-Digital intake workflow** |
-| **Power Instability** | Unaddressed by software | Unaddressed by software | **Built-in battery & power-loss detection alerts** |
-| **Data Integrity** | Standard DB logs | Standard DB audit | **Cryptographic SHA-256 chained ledger (NDPA 2023)** |
-| **Care Coordination** | Complex multi-facility tools | Complex referral modules | **Streamlined PHC-to-Secondary referral tracker** |
+| Visit Date | Blood Pressure | Temp | Pulse | Weight | Clinical Note |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Today** | **126 / 82 mmHg** (Controlled) | 36.8°C | 74 bpm | 75.5 kg | Responding well to Amlodipine |
+| **1 Month Ago** | **142 / 90 mmHg** (High Stage 1) | 36.7°C | 78 bpm | 76.0 kg | Dose adjusted to 10mg |
+| **3 Months Ago** | **160 / 98 mmHg** (High Stage 2) | 37.0°C | 84 bpm | 78.2 kg | Initial presentation with headaches |
 
----
-
-## 3. What We Are KEEPING (Existing Assets)
-
-We do **not** throw away your existing hard work. We leverage the core security and cryptographic middleware that made WardVault strong in Track C:
-
-1. **FastAPI Gateway Engine & Dual-DB Architecture:**
-   - Keep the clean asynchronous FastAPI backend.
-   - Keep the dual SQLite/PostgreSQL layer (runs instantly on SQLite locally; can scale to Postgres in the cloud).
-2. **Cryptographic SHA-256 Audit Ledger (`audit_service.py`):**
-   - Keep the blockchain-style hash chain (`user_id|action|patient_id|reason|previous_hash`).
-   - This provides undeniable proof of compliance with the **Nigeria Data Protection Act (NDPA) 2023**.
-3. **Append-Only Clinical Note Amendments (`main.py`):**
-   - Keep the `supersedes_note_id` correction flow so clinical observations cannot be retroactively erased or forged.
-4. **Offline Storage Engine & Sync Logic (`index.html` `WardVaultDB`):**
-   - Keep the IndexedDB local database and queue for pending records.
-5. **Hardware Battery & Power Loss Detection (`index.html`):**
-   - Keep the Battery API status indicators and audio alerts that notify healthcare workers when external AC power is cut.
-6. **Synthea Synthetic Patient Records:**
-   - Keep the 278 staff and 113 patient records to demonstrate realistic healthcare scenarios without violating privacy laws.
+Staff can immediately tell if blood pressure is improving without digging through stacks of archived papers.
 
 ---
 
-## 4. What We Are SUBTRACTING (Hospital Jargon to Remove)
+## 7. Staged Paper-to-Digital Migration (Three Layers)
 
-To tailor the system specifically for a Primary Healthcare Centre rather than a tertiary teaching hospital:
+Instead of an arbitrary review flag, migration is designed around real facility operations to prevent lines and duplicate records:
 
-1. **Subtract Inpatient Ward Isolation (`uch-cardiology`, `uch-surgery`, `uch-icu`):**
-   - *Reason:* PHCs are primary outpatient clinics. They do not have specialized cardiology or surgical wards. Locking records by specialized ward causes confusion in a primary clinic where a single nurse or CHEW handles all outpatients.
-2. **Subtract Doctor "Break-Glass" Emergency Override:**
-   - *Reason:* Break-glass was built for ER/ICU doctors. PHCs are staffed by Community Health Extension Workers (CHEWs), midwives, and primary care nurses.
-3. **Subtract Complex Cross-Tenant Hospital Isolation (UCH vs JAJA):**
-   - *Reason:* Reframe the multi-tenant model. Instead of two large competing tertiary hospitals, the system is designed around **one PHC** that coordinates outbound referrals to secondary/tertiary facilities.
-4. **Subtract Tertiary Administrative Roles (e.g., "Billing Clerk", "IT Admin"):**
-   - *Reason:* In rural PHCs under BHCPF (Basic Health Care Provision Fund), primary care is community-oriented. Roles should reflect real PHC staff: **Records Officer**, **Nurse / Midwife**, and **CHEW**.
+*   **Layer 1: Digital-First for New Patients**  
+    Any patient arriving at the PHC for the first time is entered directly into WardVault. No paper chart is created.
+*   **Layer 2: Dual-Track for Existing Paper Folders**  
+    When a returning patient arrives with an old paper card, the Records Officer enters their existing folder number (e.g. `ANC-042`) and basic demographics. The paper folder continues to serve as the physical legal record while current consultations run digitally in parallel.
+*   **Layer 3: Archival Catch-Up (Off-Peak Hours)**  
+    Records staff transcribe older paper chart histories during quiet afternoon hours so morning clinic queues are never kept waiting.
 
 ---
 
-## 5. What We Are ADDING (New PHC Capabilities)
+## 8. Fully Functional Closed-Loop Referral System
 
-### A. Structured Paper-to-Digital Intake Mode
-*   **Dedicated Intake Interface:** Allows records officers to rapidly transcribe historical paper folders into digital records.
-*   **Safe Handling of Illegible Notes:** A one-click checkbox: *"Flag Illegible for Clinical Review"* so data-entry staff never guess handwriting or invent clinical data.
-*   **Key PHC Identifiers:** Support for National ID (NIN), BHCPF ID, and legacy Paper Folder Number.
-
-### B. Outpatient Clinical Encounter & Vitals Workflow
-*   **Simplified Primary Care Form:** Tailored for the most common PHC presentations in Nigeria:
-    - Malaria screening (RDT results)
-    - Antenatal Care (ANC) & Maternal Health
-    - Routine Childhood Immunizations
-    - Hypertension & Diabetes screening
-*   **Vital Signs Triage:** Quick recording of Blood Pressure, Temperature, Pulse, and Weight.
-
-### C. Referral & Follow-up Coordination Engine
-*   **Outbound Referral Generator:** Generates a standard transfer slip from the PHC to a designated General Hospital or Federal Medical Centre.
-*   **Follow-up Tracker:** The PHC tracks:
-    - *Referral Status:* Referred -> Attended Secondary Facility -> Feedback Received -> Care Completed.
-
-### D. Offline Conflict Resolution & Sync Queue
-*   **Version Timestamps:** When multiple tablets record notes offline, the local gateway merges records cleanly based on patient ID and timestamp, preventing accidental overwrites.
-*   **Sync Health Monitor:** A clear visual indicator showing how many records are stored locally and waiting to be backed up to the cloud.
-
-### E. NDPA 2023 Consent & Compliance Record
-*   **Explicit Patient Consent Check:** Logged into the cryptographic audit trail for handling health data.
+To turn the current frontend mockup into a working clinical referral tool:
+1. **Real Database Backend:** A dedicated `referrals` table records patient ID, referring officer, destination hospital (e.g., *University College Hospital UCH Ibadan*, *Adeoyo Maternity*, *General Hospital Oyo*), clinical reason, urgency, and transfer notes.
+2. **Official Transfer Slip (Printable/Saveable):** One-click button generates a standard Nigerian PHC Referral Transfer Slip formatted cleanly with clinical summary, transfer vitals, and provisional diagnosis.
+3. **Care Loop Stepper:** Tracks the referral from **Initiated at PHC → In Transit → Received at Hospital → Feedback Received & Closed**.
 
 ---
 
-## 6. Implementation Roadmap & Phases
+## 9. Login Roles & Facility Access
 
-- **Phase 1: Backend & Schema Alignment**
-  - Update roles to: `Records Officer`, `Nurse`, `CHEW`, `Facility In-Charge`.
-  - Add models for `OutpatientEncounter`, `Referral`, and `PaperIntake`.
-  - Retain SHA-256 cryptographic chaining on all new event types.
-- **Phase 2: Frontend Workflow Upgrades**
-  - Build the **Paper Migration Mode** interface.
-  - Build the **Primary Care Outpatient Encounter** form.
-  - Build the **Referral & Follow-up Management** dashboard.
-- **Phase 3: Offline Resilience & Conflict Resolution**
-  - Verify offline IndexedDB operations without active Wi-Fi.
-  - Ensure automatic sync resumes as soon as connection is re-established.
-- **Phase 4: Cloud Deployment & Pitch Readiness**
-  - Configure production Dockerfile or direct cloud deployment to Render / Railway.
-  - Prepare a crisp 3-minute hackathon/pitch demo narrative following the team lead's pitch script.
+Clean, realistic staff roles for the demo:
+1. **Staff Midwife / Nurse** (`PHC/26/NUR/103` • Nurse Folake) — Consultations, ANC, deliveries, admissions.
+2. **Community Health Extension Worker (CHEW)** (`PHC/26/CHEW/102` • Amina Bello) — Triage, malaria, vaccinations, general clinic.
+3. **Records Officer** (`PHC/26/REC/101` • Ibrahim Musa) — Folder registration, paper-to-digital indexing.
+4. **Facility In-Charge (Chief)** (`PHC/26/MED/001` • Dr. Kemi Sanni) — Oversight, approvals, referral escalation, facility reports.
 
 ---
 
-## 8. Frontend De-Noising & UX Refinement Plan (Awaiting Your Approval)
+## 10. Execution Plan (What We Will Build)
 
-Based on your exact review, here is the proposed implementation plan specifying **what we are adding** and **what we are subtracting**:
-
-### A. Role Separation & CPO SIEM Access Gate
-*   **What we are SUBTRACTING:**
-    *   Remove the CPO SIEM navigation link from the nurse/CHEW workstation sidebar (`index.html`). Nurses and doctors should only focus on clinical care.
-*   **What we are ADDING:**
-    *   Strict Role-Based Access Control (RBAC): The CPO SIEM console (`/admin`) is restricted to the **Chief Privacy Officer / Security Auditor**.
-    *   If a nurse or unauthorized staff member tries to open `/admin`, they receive an access denial message.
-
----
-
-### B. Patient Directory: Physical Filing Cabinet & Department Folders
-*   **What we are SUBTRACTING:**
-    *   Remove the flat, noisy, unpaginated table of 100+ patient records that dumps everything at once.
-*   **What we are ADDING:**
-    *   **Departmental Clinic Folders (Filing Cabinets):**
-        1. 📁 **ANC Clinic (Antenatal Care):** Maternal health records (Folder series `ANC-001` to `ANC-099`).
-        2. 📁 **OPD / MED Clinic (General Outpatient):** Adult general consultation, triage, and common presentations.
-        3. 📁 **EPI / PED Clinic (Immunization & Child Health):** Under-5 children, vaccines, and nutrition records.
-        4. 📁 **CHRONIC / F-Series:** Chronic disease records (hypertension, diabetes management).
-    *   **Folder View & Pagination:**
-        *   Top view displays visual clinic folders with folder name and patient counts.
-        *   Clicking a folder opens that drawer.
-        *   **Strict 10-patient limit per view** with clean page numbers (`Page 1 of 4 • Next →`).
-        *   Alphabetical quick filter (A-Z) within the open folder.
-        *   A clean `← Back to Filing Cabinets` button to exit the folder.
+- [ ] **Step 1: Database Seed Overhaul (`database.py`, `restore_dataset.py`)**
+  - Clear out the generic 100+ Synthea rows and seed the exact 10 realistic PHC patients.
+  - Create the `short_stay_admissions` table for 1–3 day observation beds.
+  - Seed historical visit vitals (past BP readings) for returning patients.
+- [ ] **Step 2: Backend API Routes (`main.py`)**
+  - Add routes for Short-Stay Admissions: `POST /api/admissions`, `GET /api/admissions/active`, `PATCH /api/admissions/{id}/discharge`.
+  - Update `POST /api/encounters` to save structured paper clerkship fields (History, Exam, Tests, Diagnosis, Rx, Outcome).
+  - Connect full referral management with transfer slip data endpoint.
+- [ ] **Step 3: Frontend UI Redesign (`index.html`)**
+  - Simplify all labels into plain language (General Clinic, Past Visit Readings, etc.).
+  - Build the paper-style consultation room (History → Exam → Tests → Diagnosis → Rx → Outcome).
+  - Add the **Short-Stay Observation Ward** tab (1–3 days admissions).
+  - Add the **Past Visit Readings** historical vitals table for returning patients.
+  - Make referral status updates and printable transfer slips fully functional.
+- [ ] **Step 4: Verification & Git Deployment**
+  - Run automated API tests on all 10 clinical scenarios and admissions.
+  - Push to GitHub `main` for instant Render cloud deployment.
 
 ---
 
-### C. Paper-to-Digital Intake Purpose & Data
-*   **Real Data vs Demo:**
-    *   The paper intake data is realistic synthetic data from the Synthea Nigerian PHC sample set.
-    *   **Purpose:** It simulates real Nigerian PHC conditions where clerks transcribe handwritten paper folders. When handwriting is smudged or ambiguous, the clerk flags it for clinical review rather than guessing medications or allergies.
-    *   **Action:** Kept intact as a realistic showcase for USPF evaluators.
+## 11. Approval & Confirmation Gate
 
----
-
-### D. PHC Resilience Station (De-noised Mobile Controls)
-*   **What we are SUBTRACTING:**
-    *   Remove the bulky, wordy floating box ("PHC Resilience Station / USPF 2026 / Network / Sync Now...") that covers the screen and clutters mobile devices.
-*   **What we are ADDING:**
-    *   A compact, minimalist bottom pill dock with just 2 small buttons:
-        *   `🟢 Online` (tap toggles offline without wordy explanations).
-        *   `↻ Sync (0)` (tap triggers instant batch synchronization).
-    *   No explanatory text; clean, modern, and mobile-friendly.
-
----
-
-### E. Power Loss Alert Audio & Battery Step-Down Simulator
-*   **Audio Behavior:**
-    *   **Power Unplugged (Blackout):** Play the alert tone warning the nurse that AC power is disconnected.
-    *   **Power Plugged In / Charging:** Mute / silent. No alarm sounds while charging.
-*   **Battery Step-Down Logic:**
-    *   Step battery depletion down in 20% intervals (`100% -> 80% -> 60% -> 40% -> 20% -> 10%`).
-    *   Clean battery percentage indicator in the top header bar with a low-power warning at 20%.
-
----
-
-## 9. Approval Gate
-
-> **No code changes have been applied to `index.html` or `admin.html` yet.**  
-> Please review this plan. Once you give your confirmation, we will apply these refinements immediately.
-
+> **No code has been altered yet.**  
+> Please review this updated implementation plan. Once you give your confirmation, we will begin implementation and deliver the completed, plain-language MVP.
