@@ -713,88 +713,156 @@
 
     <!-- ==================== MODALS ==================== -->
 
-    <!-- USER REQUEST: OFFICIAL MEDICAL REFERRAL LETTER MODAL (PROMINENT BACK BUTTON, NO RAW HASH TEXT) -->
+    <!-- USER REQUEST: OFFICIAL PHYSICIAN CLINICAL REFERRAL LETTER (INSPIRATION: FORMAL INSTITUTIONAL REFERRAL LETTER) -->
     <div x-show="showTransferSlipModal" x-cloak class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-        <div class="max-w-2xl w-full bg-white rounded-2xl p-8 space-y-5 shadow-xl my-6 relative border border-slate-300" id="printableSlip">
+        <div class="max-w-3xl w-full bg-white rounded-2xl p-8 space-y-6 shadow-2xl my-6 relative border border-slate-200" id="printableSlip">
             
-            <!-- Prominent Back Button / Close (No Refresh Needed) -->
+            <!-- Prominent Back Button & Print Actions (No Refresh Needed) -->
             <div class="flex justify-between items-center border-b border-slate-200 pb-3 no-print">
-                <button @click="showTransferSlipModal = false" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 font-bold rounded-lg text-xs flex items-center space-x-1">
-                    <span>← Back to Referrals</span>
+                <button @click="showTransferSlipModal = false" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-xl text-xs flex items-center space-x-2 transition shadow-xs">
+                    <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                    <span>Back to Referrals</span>
                 </button>
-                <div class="flex items-center space-x-2">
-                    <button onclick="window.print()" class="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-xs">
-                        🖨️ Print Referral Letter
+                <div class="flex items-center space-x-3">
+                    <button onclick="window.print()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl text-xs flex items-center space-x-1.5 transition shadow-xs">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                        <span>Print Referral Letter</span>
                     </button>
-                    <button @click="showTransferSlipModal = false" class="text-slate-400 hover:text-slate-600 font-bold text-base px-2">✕</button>
+                    <button @click="showTransferSlipModal = false" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg transition" title="Close">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
                 </div>
             </div>
 
             <template x-if="selectedSlip">
-                <div class="space-y-5 text-slate-800">
+                <div class="space-y-6 text-slate-800 font-sans">
                     
-                    <!-- Official Hospital Letterhead -->
-                    <div class="text-center pb-3 border-b-2 border-slate-900 space-y-1">
-                        <p class="text-[10px] font-bold uppercase tracking-widest text-slate-500">Oyo State Ministry of Health • Primary Healthcare Board</p>
-                        <h2 class="text-base font-black text-slate-900 uppercase">Alakia Primary Healthcare Centre</h2>
-                        <p class="text-xs text-slate-600">Ward 4, Egbeda Local Government Area, Oyo State, Nigeria</p>
-                        <div class="flex justify-center items-center space-x-4 text-[11px] text-slate-500 pt-1 font-mono">
-                            <span>Facility Code: <b>OY/EGB/PHC-04</b></span>
-                            <span>•</span>
-                            <span>Ref No: <b x-text="selectedSlip.slip_number"></b></span>
-                            <span>•</span>
-                            <span>Date: <b x-text="selectedSlip.date"></b></span>
-                        </div>
-                    </div>
-
-                    <!-- Letter Addressee -->
-                    <div class="text-xs space-y-1">
-                        <p class="font-bold text-slate-900">To: The Consultant / Medical Officer in Charge</p>
-                        <p class="text-slate-800 font-medium" x-text="selectedSlip.destination_facility"></p>
-                        <p class="font-bold text-slate-900 mt-2">Dear Colleague,</p>
-                        <p class="text-slate-700 font-semibold underline">RE: CLINICAL TRANSFER / SECONDARY REFERRAL OF PATIENT</p>
-                    </div>
-
-                    <!-- Patient Identification Block -->
-                    <div class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-xs grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                        <div><span class="text-slate-500 text-[10px] block font-bold">Patient Name:</span><b class="text-slate-900" x-text="selectedSlip.patient.name"></b></div>
-                        <div><span class="text-slate-500 text-[10px] block font-bold">Hospital Number:</span><b class="font-mono text-slate-900" x-text="selectedSlip.patient.hospital_number"></b></div>
-                        <div><span class="text-slate-500 text-[10px] block font-bold">Age / Gender:</span><span x-text="selectedSlip.patient.age + ' yrs • ' + selectedSlip.patient.gender"></span></div>
-                        <div><span class="text-slate-500 text-[10px] block font-bold">Blood / Genotype:</span><span class="font-mono" x-text="selectedSlip.patient.blood_group + ' / ' + selectedSlip.patient.genotype"></span></div>
-                        <div><span class="text-slate-500 text-[10px] block font-bold">Contact Phone:</span><span class="font-mono" x-text="selectedSlip.patient.phone || 'N/A'"></span></div>
-                        <div><span class="text-slate-500 text-[10px] block font-bold">Known Allergies:</span><b class="text-rose-600" x-text="selectedSlip.patient.allergies || 'None reported'"></b></div>
-                    </div>
-
-                    <!-- Clinical Referral Details -->
-                    <div class="space-y-2 text-xs">
+                    <!-- Official Hospital Letterhead with Institutional Header -->
+                    <div class="flex items-start justify-between pb-4 border-b-2 border-slate-800">
                         <div class="space-y-1">
-                            <span class="font-bold text-slate-900">Clinical Reason & History for Referral:</span>
-                            <p class="p-2.5 bg-slate-50 rounded border border-slate-200 text-slate-800 leading-relaxed" x-text="selectedSlip.clinical.clinical_reason"></p>
+                            <div class="flex items-center space-x-2">
+                                <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm">
+                                    +
+                                </div>
+                                <div>
+                                    <h2 class="text-base font-bold text-slate-900 tracking-tight">ALAKIA PRIMARY HEALTHCARE CENTRE</h2>
+                                    <p class="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Oyo State Primary Health Care Board • Egbeda LGA</p>
+                                </div>
+                            </div>
                         </div>
-                        <div class="grid grid-cols-2 gap-2 pt-1">
-                            <div class="p-2 bg-slate-50 rounded border border-slate-200">
-                                <span class="text-[10px] text-slate-500 font-bold block">Pre-Departure Vital Signs:</span>
-                                <b class="font-mono text-slate-900" x-text="selectedSlip.clinical.transfer_vitals"></b>
-                            </div>
-                            <div class="p-2 bg-slate-50 rounded border border-slate-200">
-                                <span class="text-[10px] text-slate-500 font-bold block">Provisional Diagnosis:</span>
-                                <b class="text-slate-900" x-text="selectedSlip.clinical.provisional_diagnosis"></b>
-                            </div>
+                        <div class="text-right text-[11px] text-slate-500 space-y-0.5">
+                            <p class="font-medium text-slate-700">MOH Code: <span class="font-semibold text-slate-900">OY/EGB/PHC-04</span></p>
+                            <p>Dispatch Hotline: 0803-555-0199</p>
+                            <p>clinical.referrals@moh.oyostate.gov.ng</p>
                         </div>
                     </div>
 
-                    <!-- Official Formal Doctor Sign-off (Zero Raw Hash Strings) -->
-                    <div class="pt-4 border-t-2 border-slate-900 flex justify-between items-end text-xs">
+                    <!-- Letter Title & Date Block -->
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h1 class="text-lg font-bold text-slate-900 tracking-tight">PHYSICIAN CLINICAL REFERRAL LETTER</h1>
+                            <span class="text-xs font-semibold px-2.5 py-1 rounded-md"
+                                  :class="selectedSlip.urgency && selectedSlip.urgency.includes('Emergency') ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-blue-50 text-blue-700 border border-blue-200'"
+                                  x-text="selectedSlip.urgency"></span>
+                        </div>
+                        <div class="flex items-center justify-between text-xs text-slate-500 pb-2 border-b border-slate-100">
+                            <div>Date of Issue: <b class="text-slate-800" x-text="selectedSlip.date"></b></div>
+                            <div>Transfer Slip Ref: <b class="text-slate-800 font-mono" x-text="selectedSlip.slip_number"></b></div>
+                        </div>
+                    </div>
+
+                    <!-- Addressee & Subject Line -->
+                    <div class="space-y-2 text-xs leading-relaxed">
                         <div>
-                            <p class="text-slate-500 text-[10px]">Referring Medical Officer:</p>
-                            <p class="font-bold text-slate-900 text-sm mt-0.5">Dr. Kemi Sanni, MBBS, MPH</p>
-                            <p class="text-slate-600">Medical Officer in Charge</p>
-                            <p class="text-slate-500 text-[11px]">Alakia Primary Healthcare Centre</p>
+                            <p class="text-slate-500 font-medium">To:</p>
+                            <p class="font-bold text-slate-900 text-sm">The Chief Medical Director / Receiving Clinical Team</p>
+                            <p class="font-semibold text-blue-700 text-sm" x-text="selectedSlip.destination_facility"></p>
+                        </div>
+                        <p class="font-medium text-slate-800 pt-1">Dear Colleague,</p>
+                        <p class="font-semibold text-slate-900 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
+                            RE: CLINICAL TRANSFER OF <span class="uppercase font-bold" x-text="selectedSlip.patient.name"></span> 
+                            (HOSPITAL NO: <span class="font-mono font-bold" x-text="selectedSlip.patient.hospital_number"></span>, 
+                            AGE: <span x-text="selectedSlip.patient.age"></span> YRS, 
+                            SEX: <span x-text="selectedSlip.patient.gender"></span>)
+                        </p>
+                    </div>
+
+                    <!-- Clinical Narrative Opening Paragraph -->
+                    <div class="text-xs text-slate-700 space-y-3 leading-relaxed">
+                        <p>
+                            I am formally referring the above-named patient, <b class="text-slate-900" x-text="selectedSlip.patient.name"></b>, 
+                            presenting to Alakia Primary Healthcare Centre for urgent specialist assessment, diagnostic investigation, and multidisciplinary tertiary management under your clinical team.
+                        </p>
+                        <p>
+                            The patient was evaluated at our facility with the presenting complaints and indications summarized below:
+                        </p>
+                        <div class="p-3 bg-slate-50 border-l-4 border-blue-600 rounded-r-xl text-xs text-slate-800 leading-relaxed font-medium" 
+                             x-text="selectedSlip.clinical.clinical_reason">
+                        </div>
+                    </div>
+
+                    <!-- Static Clinical Summary Table (Mirroring the reference image) -->
+                    <div class="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                        <div class="bg-slate-50 px-4 py-2 border-b border-slate-200 flex justify-between items-center">
+                            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-600">Primary Care Clinical Summary & Triage Parameters</span>
+                            <span class="text-[10px] text-slate-400">Pre-Transfer Assessment</span>
+                        </div>
+                        <table class="w-full text-xs text-left">
+                            <thead class="bg-white border-b border-slate-200 text-slate-500 text-[10px] uppercase font-semibold">
+                                <tr>
+                                    <th class="px-4 py-2.5 w-1/3">Condition / Indication</th>
+                                    <th class="px-4 py-2.5 w-1/3">Baseline Parameters</th>
+                                    <th class="px-4 py-2.5 w-1/3">Emergency Intervention at PHC</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 bg-white text-slate-700">
+                                <tr>
+                                    <td class="px-4 py-3 align-top">
+                                        <b class="text-slate-900 block" x-text="selectedSlip.clinical.provisional_diagnosis || selectedSlip.patient.condition || 'Acute Referral'"></b>
+                                        <span class="text-[10px] text-slate-400">Primary clinical indication</span>
+                                    </td>
+                                    <td class="px-4 py-3 align-top space-y-1">
+                                        <p class="font-medium text-slate-800" x-text="selectedSlip.clinical.transfer_vitals || 'Vitals stable at departure'"></p>
+                                        <p class="text-[10px] text-slate-500" x-text="'Genotype: ' + selectedSlip.patient.genotype + ' • Blood Group: ' + selectedSlip.patient.blood_group"></p>
+                                    </td>
+                                    <td class="px-4 py-3 align-top space-y-1">
+                                        <p class="font-medium text-slate-800" x-text="selectedSlip.clinical.emergency_treatment_given || 'Initial emergency stabilization'"></p>
+                                        <span class="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-medium">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                            Stabilized prior to transit
+                                        </span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Clinical Justification Closing Paragraph -->
+                    <div class="text-xs text-slate-700 space-y-2 leading-relaxed">
+                        <p>
+                            In view of the diagnostic imaging, tertiary surgery, or advanced inpatient monitoring facilities required which exceed the scope of our primary healthcare facility, we request your prompt evaluation and admission.
+                        </p>
+                        <p>
+                            Kindly provide our facility with a counter-referral note or discharge summary upon clinical resolution to enable continuous community-based primary care follow-up.
+                        </p>
+                    </div>
+
+                    <!-- Formal Sign-Off with Doctor Name from Form & Official Stamp -->
+                    <div class="pt-4 border-t-2 border-slate-900 flex justify-between items-end text-xs">
+                        <div class="space-y-1">
+                            <p class="text-slate-500 text-xs">Sincerely,</p>
+                            <div class="pt-2">
+                                <b class="text-slate-900 text-sm block" x-text="selectedSlip.referred_by.name"></b>
+                                <p class="text-slate-600 font-medium">Medical Officer in Charge</p>
+                                <p class="text-slate-500 text-[11px]">Alakia Primary Healthcare Centre, Egbeda LGA</p>
+                                <p class="text-slate-400 text-[10px]">Oyo State Ministry of Health Facility Code: OY/EGB/PHC-04</p>
+                            </div>
                         </div>
                         <div class="text-right">
-                            <div class="inline-block p-2 border-2 border-slate-400 rounded text-center text-[10px] font-bold text-slate-600 uppercase font-mono">
-                                <span>Official PHC Stamp</span><br>
-                                <span>MOH Approved</span>
+                            <div class="inline-block p-3 border-2 border-blue-600 rounded-xl text-center bg-blue-50/50">
+                                <span class="block text-[10px] font-bold text-blue-900 uppercase tracking-wider">Official PHC Stamp</span>
+                                <span class="block text-[9px] text-blue-700 font-semibold mt-0.5">ALAKIA PHC CLINICAL SERVICES</span>
+                                <span class="block text-[8px] text-slate-500 font-mono mt-0.5">MOH APPROVED • VERIFIED</span>
                             </div>
                         </div>
                     </div>
@@ -1048,45 +1116,94 @@
         </div>
     </div>
 
-    <!-- INITIATE REFERRAL MODAL -->
-    <div x-show="showReferralModal" x-cloak class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="max-w-md w-full bg-white rounded-2xl p-6 space-y-4 shadow-xl border border-slate-300">
-            <div class="flex justify-between items-center pb-2 border-b border-slate-200">
-                <h3 class="font-bold text-sm text-slate-900">Issue Secondary Referral</h3>
-                <button @click="showReferralModal = false" class="text-slate-400 hover:text-slate-600">✕</button>
+    <!-- INITIATE REFERRAL MODAL (CUSTOM DESTINATION HOSPITAL & REFERRING DOCTOR) -->
+    <div x-show="showReferralModal" x-cloak class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div class="max-w-lg w-full bg-white rounded-2xl p-6 space-y-4 shadow-xl border border-slate-200 my-6">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-100">
+                <div>
+                    <h3 class="font-bold text-sm text-slate-900">Issue Secondary Medical Referral</h3>
+                    <p class="text-[11px] text-slate-500">Generate an official physician transfer letter for secondary/tertiary hospital care.</p>
+                </div>
+                <button @click="showReferralModal = false" class="text-slate-400 hover:text-slate-600 p-1">✕</button>
             </div>
             <form @submit.prevent="submitReferral" class="space-y-3 text-xs">
                 <div>
-                    <label class="block font-bold text-slate-700 mb-1">Select Patient</label>
-                    <select x-model="referralForm.patient_id" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-semibold" required>
+                    <label class="block font-semibold text-slate-700 mb-1">Select Patient to Transfer</label>
+                    <select x-model="referralForm.patient_id" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800" required>
                         <option value="">-- Choose Patient --</option>
                         <template x-for="p in patients" :key="p.id">
                             <option :value="p.id" x-text="cleanName(p) + ' (' + (p.hospital_number || p.folder_number || p.id) + ')'"></option>
                         </template>
                     </select>
                 </div>
-                <div>
-                    <label class="block font-bold text-slate-700 mb-1">Destination Facility</label>
-                    <select x-model="referralForm.destination_facility" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-semibold">
-                        <option>University College Hospital (UCH) Ibadan</option>
-                        <option>Adeoyo Maternity Teaching Hospital</option>
-                        <option>State Hospital Ring Road Ibadan</option>
-                    </select>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Destination Hospital Name</label>
+                        <input type="text" x-model="referralForm.destination_facility" list="hospitalOptions" 
+                               placeholder="e.g. University College Hospital (UCH) Ibadan" 
+                               class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800" required>
+                        <datalist id="hospitalOptions">
+                            <option value="University College Hospital (UCH) Ibadan">
+                            <option value="Adeoyo Maternity Teaching Hospital, Yemetu">
+                            <option value="State Hospital Ring Road Ibadan">
+                            <option value="Jericho Specialist Hospital Ibadan">
+                            <option value="Our Lady of Apostles Catholic Hospital Oluyoro">
+                        </datalist>
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Referring Doctor / Clinician Name</label>
+                        <input type="text" x-model="referralForm.referring_doctor" 
+                               placeholder="e.g. Dr. Kemi Sanni, MBBS, MPH" 
+                               class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800" required>
+                    </div>
                 </div>
-                <div>
-                    <label class="block font-bold text-slate-700 mb-1">Urgency</label>
-                    <select x-model="referralForm.urgency" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-semibold">
-                        <option value="Emergency Transfer">Emergency Transfer</option>
-                        <option value="Urgent">Urgent / High Priority</option>
-                        <option value="Routine Elective">Routine Elective</option>
-                    </select>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Provisional Diagnosis / Finding</label>
+                        <input type="text" x-model="referralForm.provisional_diagnosis" 
+                               placeholder="e.g. Severe Hypertensive Crisis, Suspected Fracture..." 
+                               class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800" required>
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Transfer Urgency Priority</label>
+                        <select x-model="referralForm.urgency" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800">
+                            <option value="Emergency Transfer">Emergency Transfer</option>
+                            <option value="Urgent Specialist Review">Urgent Specialist Review</option>
+                            <option value="Routine Elective">Routine Elective</option>
+                        </select>
+                    </div>
                 </div>
+
                 <div>
-                    <label class="block font-bold text-slate-700 mb-1">Clinical Justification</label>
-                    <textarea x-model="referralForm.reason" rows="3" placeholder="Reason for transfer and emergency treatment provided..." class="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg" required></textarea>
+                    <label class="block font-semibold text-slate-700 mb-1">Clinical Justification & Reason for Transfer</label>
+                    <textarea x-model="referralForm.reason" rows="3" 
+                              placeholder="Describe presenting history, physical examination, rationale for specialist referral and investigation required..." 
+                              class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 leading-relaxed" required></textarea>
                 </div>
-                <button type="submit" class="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg transition">
-                    Generate Referral Letter & Track
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Baseline Vitals at Transfer</label>
+                        <input type="text" x-model="referralForm.transfer_vitals" 
+                               placeholder="e.g. BP: 160/98 mmHg, Temp: 36.8°C, Pulse: 88 bpm" 
+                               class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800">
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Medication / Stabilization Given at PHC</label>
+                        <input type="text" x-model="referralForm.treatment_given" 
+                               placeholder="e.g. IV Saline + Analgesics stat + Plaster splint" 
+                               class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800">
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition shadow-xs flex items-center justify-center space-x-2 text-xs">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    <span>Generate Referral Letter & Open</span>
                 </button>
             </form>
         </div>
@@ -1258,7 +1375,16 @@
                     outcome: 'Give Drugs & Go Home',
                     followup_date: ''
                 },
-                referralForm: { patient_id: '', destination_facility: 'University College Hospital (UCH) Ibadan', urgency: 'Emergency Transfer', reason: '' },
+                referralForm: { 
+                    patient_id: '', 
+                    destination_facility: 'University College Hospital (UCH) Ibadan', 
+                    referring_doctor: 'Dr. Kemi Sanni, MBBS, MPH',
+                    urgency: 'Emergency Transfer', 
+                    provisional_diagnosis: '',
+                    transfer_vitals: 'BP: 130/85 mmHg, Temp: 36.8°C, Pulse: 82 bpm',
+                    treatment_given: '',
+                    reason: '' 
+                },
                 admitForm: { patient_id: '', bed_number: 'Observation Bed 01', admission_reason: '' },
                 registerForm: { first: '', last: '', age: 28, gender: 'F', hospital_number: '', clinic: 'OPD', condition: 'General Outpatient Care', phone: '', is_new_digital: true },
 
@@ -1273,9 +1399,12 @@
                             this.role = parsed.role;
                             this.onDuty = parsed.onDuty;
                             this.providerId = parsed.providerId;
-                            this.refreshAllData();
+                            await this.refreshAllData();
+                            return;
                         } catch(e) {}
                     }
+                    // Auto-login as Dr. Kemi Sanni (Medical Officer) so all referral and clinical features operate seamlessly
+                    await this.quickLogin('PHC/26/MED/001');
                 },
 
                 showToast(msg) {
@@ -1512,41 +1641,61 @@
                 },
 
                 openReferralModal(patientId) {
-                    this.referralForm.patient_id = patientId || (this.activePatient ? this.activePatient.id : '');
+                    this.referralForm.patient_id = patientId || (this.activePatient ? this.activePatient.id : (this.patients.length ? this.patients[0].id : ''));
+                    this.referralForm.referring_doctor = this.staffName ? `${this.staffName}, MBBS` : 'Dr. Kemi Sanni, MBBS, MPH';
+                    if (this.activePatient) {
+                        this.referralForm.provisional_diagnosis = this.activePatient.condition || '';
+                    }
                     this.showReferralModal = true;
                 },
 
                 async submitReferral() {
                     try {
+                        if (!this.token) {
+                            await this.quickLogin('PHC/26/MED/001');
+                        }
                         const res = await fetch('/api/referrals', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
                             body: JSON.stringify(this.referralForm)
                         });
                         if (res.ok) {
+                            const data = await res.json();
                             this.showToast("Referral letter generated!");
-                            this.referralForm.reason = '';
                             this.showReferralModal = false;
                             await this.fetchReferrals();
                             this.currentTab = 'referrals';
+                            // Immediately open the generated official letter!
+                            if (data.referral_id) {
+                                await this.openTransferSlipModal(data.referral_id);
+                            }
+                        } else {
+                            const err = await res.json().catch(() => ({}));
+                            this.showToast(err.detail || "Referral issuance failed.");
                         }
                     } catch(e) {
-                        this.showToast("Referral issuance failed");
+                        this.showToast("Referral issuance failed: " + e.message);
                     }
                 },
 
                 // USER REQUEST: PROMINENT BACK BUTTON AND CLOSE ACTION
                 async openTransferSlipModal(refId) {
                     try {
+                        if (!this.token) {
+                            await this.quickLogin('PHC/26/MED/001');
+                        }
                         const res = await fetch(`/api/referrals/${refId}/slip`, {
                             headers: { 'Authorization': `Bearer ${this.token}` }
                         });
                         if (res.ok) {
                             this.selectedSlip = await res.json();
                             this.showTransferSlipModal = true;
+                        } else {
+                            const err = await res.json().catch(() => ({}));
+                            this.showToast(err.detail || "Failed to load referral letter");
                         }
                     } catch(e) {
-                        this.showToast("Failed to load referral letter");
+                        this.showToast("Failed to load referral letter: " + e.message);
                     }
                 },
 

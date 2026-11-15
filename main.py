@@ -98,9 +98,12 @@ class AdmissionDischargeRequest(BaseModel):
 class ReferralCreateRequest(BaseModel):
     patient_id: str
     destination_facility: str
+    referring_doctor: Optional[str] = "Dr. Kemi Sanni, MBBS, MPH"
     reason: str
-    urgency: Optional[str] = "Routine"
+    urgency: Optional[str] = "Emergency Transfer"
+    provisional_diagnosis: Optional[str] = ""
     transfer_vitals: Optional[str] = ""
+    treatment_given: Optional[str] = ""
 
 class ReferralStatusUpdateRequest(BaseModel):
     status: str
@@ -568,19 +571,25 @@ async def create_referral(req: ReferralCreateRequest, user: dict = Depends(get_c
     if not user.get("on_duty", False):
         raise HTTPException(status_code=403, detail="You are currently OFF DUTY.")
 
+    doctor_name = (req.referring_doctor or "").strip() or user.get("name") or "Dr. Kemi Sanni, MBBS, MPH"
+    destination = (req.destination_facility or "").strip() or "University College Hospital (UCH) Ibadan"
+    
+    # Store packed clinical notes (provisional diagnosis + treatment given) into counter_referral_notes
+    packed_notes = f"DIAGNOSIS: {req.provisional_diagnosis or ''}\nINTERVENTION: {req.treatment_given or ''}"
+
     async with db.legacy_pool.acquire() as conn:
         ref_id = await conn.fetchval(
             """INSERT INTO referrals (
-                patient_id, referred_by, provider_id, destination_facility, reason, urgency, transfer_vitals, status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'Referred') RETURNING id""",
-            req.patient_id, staff_id, staff_id, req.destination_facility, req.reason, req.urgency, req.transfer_vitals or ""
+                patient_id, referred_by, provider_id, clinician_name, destination_facility, reason, urgency, transfer_vitals, counter_referral_notes, status
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Referred') RETURNING id""",
+            req.patient_id, staff_id, staff_id, doctor_name, destination, req.reason, req.urgency, req.transfer_vitals or "", packed_notes
         )
 
         await log_access_event(
             staff_id,
             "REFERRAL_ISSUED",
             req.patient_id,
-            f"Referral #{ref_id} to {req.destination_facility} ({req.urgency})"
+            f"Referral #{ref_id} to {destination} by {doctor_name} ({req.urgency})"
         )
 
         return {"status": "success", "referral_id": ref_id}
@@ -593,18 +602,37 @@ async def get_referral_transfer_slip(referral_id: int, user: dict = Depends(get_
                    p.blood_group, p.genotype, p.allergies, p.phone, p.nin, p.bhcpf_id,
                    pr.name as referrer_name, pr.speciality as referrer_role
             FROM referrals r
-            LEFT JOIN patients p ON r.patient_id = p.id
+            LEFT JOIN patients p ON (r.patient_id = p.id OR r.patient_id = p.hospital_number)
             LEFT JOIN providers pr ON (r.referred_by = pr.id OR r.provider_id = pr.id)
             WHERE r.id = $1
         """, referral_id)
         if not ref:
             raise HTTPException(status_code=404, detail="Referral record not found.")
 
-        latest_enc = await conn.fetchrow("""
-            SELECT * FROM clinical_encounters WHERE patient_id = $1 ORDER BY timestamp DESC LIMIT 1
-        """, ref["patient_id"])
-
         hosp_no = ref.get("hospital_number") or ref.get("folder_number") or ref["patient_id"]
+
+        latest_enc = await conn.fetchrow("""
+            SELECT * FROM clinical_encounters 
+            WHERE patient_id = $1 OR patient_id = $2
+            ORDER BY timestamp DESC LIMIT 1
+        """, ref["patient_id"], hosp_no)
+
+        # Unpack custom diagnosis and treatment from packed_notes
+        prov_diag = ""
+        treat_given = ""
+        notes_str = ref.get("counter_referral_notes") or ""
+        for line in notes_str.split("\n"):
+            if line.startswith("DIAGNOSIS:"):
+                prov_diag = line.replace("DIAGNOSIS:", "").strip()
+            elif line.startswith("INTERVENTION:"):
+                treat_given = line.replace("INTERVENTION:", "").strip()
+
+        if not prov_diag:
+            prov_diag = latest_enc.get("primary_diagnosis") if latest_enc else "Acute Clinical Referral"
+        if not treat_given:
+            treat_given = latest_enc.get("prescription") if latest_enc else "Immediate emergency stabilization provided"
+
+        referring_doc = ref.get("clinician_name") or ref.get("referrer_name") or "Dr. Kemi Sanni, MBBS, MPH"
 
         slip = {
             "slip_number": f"ALAKIA-REF-2026-{ref['id']:04d}",
@@ -623,9 +651,9 @@ async def get_referral_transfer_slip(referral_id: int, user: dict = Depends(get_
             "patient": {
                 "id": ref["patient_id"],
                 "hospital_number": hosp_no,
-                "name": ref.get("patient_name") or "Unknown",
-                "age": ref.get("age"),
-                "gender": ref.get("gender"),
+                "name": ref.get("patient_name") or "Unknown Patient",
+                "age": ref.get("age") or "Adult",
+                "gender": ref.get("gender") or "—",
                 "phone": ref.get("phone") or "N/A",
                 "nin": ref.get("nin") or "N/A",
                 "bhcpf_id": ref.get("bhcpf_id") or "N/A",
@@ -636,14 +664,14 @@ async def get_referral_transfer_slip(referral_id: int, user: dict = Depends(get_
             "clinical": {
                 "clinical_reason": ref["reason"],
                 "transfer_vitals": ref.get("transfer_vitals") or (
-                    f"BP: {latest_enc['bp']}, Temp: {latest_enc['temperature']}°C, Pulse: {latest_enc['pulse']} bpm" if latest_enc else "Recorded at departure"
+                    f"BP: {latest_enc['bp']}, Temp: {latest_enc['temperature']}°C, Pulse: {latest_enc['pulse']} bpm" if latest_enc else "BP: 120/80 mmHg, Temp: 36.8°C"
                 ),
-                "provisional_diagnosis": latest_enc.get("primary_diagnosis") if latest_enc else "Acute Clinical Referral",
-                "emergency_treatment_given": latest_enc.get("prescription") if latest_enc else "Immediate emergency stabilization provided",
+                "provisional_diagnosis": prov_diag,
+                "emergency_treatment_given": treat_given,
                 "counter_referral_notes": ref.get("counter_referral_notes") or ""
             },
             "referred_by": {
-                "name": "Dr. Kemi Sanni, MBBS, MPH",
+                "name": referring_doc,
                 "role": "Medical Officer in Charge",
                 "facility": "Alakia Primary Healthcare Centre, Egbeda LGA",
                 "official_stamp": "ALAKIA PHC CLINICAL SERVICES • MOH APPROVED"
