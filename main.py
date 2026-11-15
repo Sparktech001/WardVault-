@@ -109,6 +109,12 @@ class ReferralCreateRequest(BaseModel):
 class ReferralStatusUpdateRequest(BaseModel):
     status: str
     notes: Optional[str] = ""
+    receiving_officer: Optional[str] = ""
+    receiving_facility: Optional[str] = ""
+    receiving_ward: Optional[str] = ""
+    handover_outcome: Optional[str] = ""
+    arrival_vitals: Optional[str] = ""
+    escort_staff: Optional[str] = ""
 
 class ClinicalNoteRequest(BaseModel):
     patient_id: str
@@ -543,6 +549,40 @@ async def discharge_admission(admission_id: int, req: AdmissionDischargeRequest,
         return {"status": "success", "message": f"Patient discharged from {adm['bed_number']}"}
 
 # --- REFERRALS & PRINTABLE SECONDARY TRANSFER SLIPS ---
+def parse_handover_report(notes_str: str) -> Optional[Dict[str, Any]]:
+    if not notes_str or "--- CONFIRMED HANDOVER" not in notes_str:
+        return None
+    report = {
+        "is_confirmed": True,
+        "receiving_officer": "Attending Medical Officer",
+        "receiving_ward": "Emergency / Inpatient Ward",
+        "receiving_facility": "Specialist Hospital",
+        "arrival_vitals": "Stable in transit",
+        "handover_outcome": "Admitted to Ward",
+        "escort_staff": "PHC Ambulance Escort",
+        "report_notes": "Clinical handover completed.",
+        "confirmed_at": ""
+    }
+    for line in notes_str.split("\n"):
+        line = line.strip()
+        if line.startswith("RECEIVING_OFFICER:"):
+            report["receiving_officer"] = line.replace("RECEIVING_OFFICER:", "").strip()
+        elif line.startswith("RECEIVING_WARD:"):
+            report["receiving_ward"] = line.replace("RECEIVING_WARD:", "").strip()
+        elif line.startswith("RECEIVING_FACILITY:"):
+            report["receiving_facility"] = line.replace("RECEIVING_FACILITY:", "").strip()
+        elif line.startswith("ARRIVAL_VITALS:"):
+            report["arrival_vitals"] = line.replace("ARRIVAL_VITALS:", "").strip()
+        elif line.startswith("HANDOVER_OUTCOME:"):
+            report["handover_outcome"] = line.replace("HANDOVER_OUTCOME:", "").strip()
+        elif line.startswith("ESCORT_STAFF:"):
+            report["escort_staff"] = line.replace("ESCORT_STAFF:", "").strip()
+        elif line.startswith("REPORT_NOTES:"):
+            report["report_notes"] = line.replace("REPORT_NOTES:", "").strip()
+        elif line.startswith("CONFIRMED_AT:"):
+            report["confirmed_at"] = line.replace("CONFIRMED_AT:", "").strip()
+    return report
+
 @app.get("/api/referrals")
 async def get_referrals(user: dict = Depends(get_current_user)):
     async with db.legacy_pool.acquire() as conn:
@@ -569,6 +609,7 @@ async def get_referrals(user: dict = Depends(get_current_user)):
                 "status": r["status"],
                 "transfer_vitals": r.get("transfer_vitals") or "",
                 "counter_referral_notes": r.get("counter_referral_notes") or "",
+                "handover_report": parse_handover_report(r.get("counter_referral_notes") or ""),
                 "created_at": str(r["created_at"]),
                 "updated_at": str(r["updated_at"])
             }
@@ -665,6 +706,7 @@ async def get_referral_transfer_slip(referral_id: int, user: dict = Depends(get_
             "destination_facility": ref["destination_facility"],
             "urgency": ref["urgency"],
             "status": ref["status"],
+            "handover_report": parse_handover_report(ref.get("counter_referral_notes") or ""),
             "patient": {
                 "id": ref["patient_id"],
                 "hospital_number": hosp_no,
@@ -705,16 +747,41 @@ async def update_referral_status(referral_id: int, req: ReferralStatusUpdateRequ
         if not ref:
             raise HTTPException(status_code=404, detail="Referral record not found.")
 
+        existing_notes = ref.get("counter_referral_notes") or ""
+
+        # Check if this is a confirmed handover report submission
+        if req.receiving_officer or req.handover_outcome or req.receiving_ward or "Handover Confirmed" in req.status:
+            confirmed_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            handover_payload = f"""
+--- CONFIRMED HANDOVER & COUNTER-REFERRAL REPORT ---
+RECEIVING_OFFICER: {req.receiving_officer or 'Attending Medical Officer'}
+RECEIVING_WARD: {req.receiving_ward or 'Emergency Trauma Unit'}
+RECEIVING_FACILITY: {req.receiving_facility or ref['destination_facility']}
+ARRIVAL_VITALS: {req.arrival_vitals or 'Stable in transit'}
+HANDOVER_OUTCOME: {req.handover_outcome or 'Admitted to Inpatient Ward'}
+ESCORT_STAFF: {req.escort_staff or user.get('name') or 'PHC Clinical Escort'}
+REPORT_NOTES: {req.notes or 'Clinical handover signed off and completed without incident.'}
+CONFIRMED_AT: {confirmed_timestamp}
+"""
+            new_notes = existing_notes.strip() + "\n" + handover_payload.strip()
+            final_status = "Handover Confirmed & Reported"
+        else:
+            if req.notes:
+                new_notes = existing_notes.strip() + f"\nSTATUS_NOTE: {req.notes}"
+            else:
+                new_notes = existing_notes
+            final_status = req.status
+
         await conn.execute(
             "UPDATE referrals SET status = $1, counter_referral_notes = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3",
-            req.status, req.notes or "", referral_id
+            final_status, new_notes, referral_id
         )
 
         await log_access_event(
             staff_id,
             "REFERRAL_STATUS_UPDATED",
             ref["patient_id"],
-            f"Referral #{referral_id} updated to '{req.status}'"
+            f"Referral #{referral_id} updated to '{final_status}'" + (f" (Receiving Officer: {req.receiving_officer})" if req.receiving_officer else "")
         )
 
         return {"status": "success", "message": f"Referral status updated to {req.status}"}

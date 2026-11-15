@@ -661,22 +661,46 @@
 
                                 <p class="text-slate-700 text-xs bg-slate-50 p-2.5 rounded border border-slate-200" x-text="ref.reason"></p>
 
-                                <div class="flex justify-between items-center pt-1 text-xs">
+                                <!-- Confirmed Handover Report Card (Shown when confirmed) -->
+                                <template x-if="ref.handover_report && ref.handover_report.is_confirmed">
+                                    <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-xs text-slate-800 space-y-1">
+                                        <div class="flex justify-between items-center text-emerald-900 font-bold pb-1 border-b border-emerald-200">
+                                            <span>✅ Transfer Handover Confirmed & Reported</span>
+                                            <span class="text-[11px] font-normal" x-text="'Confirmed: ' + ref.handover_report.confirmed_at"></span>
+                                        </div>
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-1 pt-1">
+                                            <p><b>Receiving Clinician:</b> <span x-text="ref.handover_report.receiving_officer"></span></p>
+                                            <p><b>Ward:</b> <span x-text="ref.handover_report.receiving_ward"></span></p>
+                                            <p><b>Arrival Condition:</b> <span x-text="ref.handover_report.arrival_vitals"></span></p>
+                                            <p><b>Outcome:</b> <span class="font-semibold text-emerald-900" x-text="ref.handover_report.handover_outcome"></span></p>
+                                        </div>
+                                        <p class="pt-1 text-slate-700"><b>Handover Summary:</b> <span x-text="ref.handover_report.report_notes"></span></p>
+                                    </div>
+                                </template>
+
+                                <div class="flex flex-wrap justify-between items-center gap-2 pt-1 text-xs">
                                     <!-- View Official Letter Slip -->
-                                    <button @click="openTransferSlipModal(ref.id)" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-[11px] flex items-center space-x-1.5">
+                                    <button @click="openTransferSlipModal(ref.id)" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-[11px] flex items-center space-x-1.5 transition">
                                         <span>🖨️</span>
                                         <span>View & Print Official Referral Letter</span>
                                     </button>
 
-                                    <!-- Status Care Stepper -->
+                                    <!-- Status & Handover Action Button -->
                                     <div class="flex items-center space-x-2">
-                                        <span class="text-slate-500 text-[11px]">Status: <b class="text-slate-900" x-text="ref.status"></b></span>
-                                        <button x-show="ref.status === 'Referred'" @click="advanceReferral(ref.id, 'In Transit')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 font-semibold rounded text-[11px]">
-                                            Dispatched (In Transit)
-                                        </button>
-                                        <button x-show="ref.status === 'In Transit'" @click="advanceReferral(ref.id, 'Received at Hospital')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 font-semibold rounded text-[11px]">
-                                            Received at Hospital
-                                        </button>
+                                        <template x-if="ref.handover_report && ref.handover_report.is_confirmed">
+                                            <span class="px-2 py-1 bg-emerald-100 text-emerald-800 font-bold rounded text-[11px]">
+                                                ✅ Completed
+                                            </span>
+                                        </template>
+                                        <template x-if="!ref.handover_report || !ref.handover_report.is_confirmed">
+                                            <div class="flex items-center space-x-2">
+                                                <span class="text-slate-500 text-[11px]">Status: <b class="text-slate-900" x-text="ref.status"></b></span>
+                                                <button @click="openHandoverModal(ref.id)" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[11px] shadow transition flex items-center space-x-1">
+                                                    <span>📝</span>
+                                                    <span>Confirm Handover & Report</span>
+                                                </button>
+                                            </div>
+                                        </template>
                                     </div>
                                 </div>
                             </div>
@@ -720,29 +744,53 @@
          x-cloak 
          class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm overflow-y-auto p-3 sm:p-6 flex justify-center items-start">
         
+        <!-- FLOATING TOP ACTION BAR: ALWAYS FRONT & CENTER, ACCESSIBLE ON EVERY SCREEN -->
+        <div class="fixed top-3 left-1/2 -translate-x-1/2 z-[100] bg-slate-900 text-white px-4 py-2 rounded-full shadow-2xl flex items-center space-x-2 border border-slate-700 no-print">
+            <button @click="showTransferSlipModal = false" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-full font-semibold text-xs flex items-center space-x-1 transition">
+                <span>←</span>
+                <span>Back</span>
+            </button>
+            <div class="h-4 w-px bg-slate-700"></div>
+            <button @click="downloadReferralLetter()" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-full font-semibold text-xs flex items-center space-x-1 transition">
+                <span>⬇</span>
+                <span>Download (.html)</span>
+            </button>
+            <button onclick="window.print()" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-full font-semibold text-xs flex items-center space-x-1 transition">
+                <span>🖨️</span>
+                <span>Print</span>
+            </button>
+            <template x-if="selectedSlip && (!selectedSlip.handover_report || !selectedSlip.handover_report.is_confirmed)">
+                <button @click="openHandoverModal(selectedSlip.referral_id)" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-full text-xs shadow transition">
+                    📝 Confirm Handover
+                </button>
+            </template>
+            <div class="h-4 w-px bg-slate-700"></div>
+            <button @click="showTransferSlipModal = false" class="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-full text-xs shadow transition flex items-center space-x-1">
+                <span>✕</span>
+                <span>CLOSE</span>
+            </button>
+        </div>
+
         <!-- Persistent Floating Close Button (ALWAYS VISIBLE AT TOP-RIGHT OF SCREEN) -->
         <button @click="showTransferSlipModal = false" 
-                class="fixed top-4 right-4 z-[70] bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-600 border border-slate-300 rounded-full w-10 h-10 flex items-center justify-center shadow-2xl font-bold text-lg transition no-print" 
+                class="fixed top-3 right-3 z-[110] bg-rose-600 hover:bg-rose-700 text-white border-2 border-white rounded-full w-10 h-10 flex items-center justify-center shadow-2xl font-bold text-lg transition no-print" 
                 title="Exit Letter (or press Esc)">✕</button>
 
-        <div class="max-w-2xl w-full bg-white rounded-2xl p-6 sm:p-8 space-y-5 shadow-2xl my-4 relative border border-slate-200" id="printableSlip">
+        <div class="max-w-2xl w-full bg-white rounded-2xl p-6 sm:p-8 space-y-5 shadow-2xl my-8 relative border border-slate-300" id="printableSlip">
             
-            <!-- Sticky Top Header Controls (Back, Download, Print & Close '✕') -->
-            <div class="sticky -top-6 sm:-top-8 z-30 bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center -mx-6 sm:-mx-8 -mt-6 sm:-mt-8 mb-4 rounded-t-2xl shadow-xs no-print">
-                <button @click="showTransferSlipModal = false" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg text-xs flex items-center space-x-1.5 transition">
-                    <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                    <span>Back to Referrals</span>
-                </button>
+            <!-- Document Header Toolbar (Non-Sticky, Clean Inside Paper) -->
+            <div class="flex justify-between items-center pb-3 border-b border-slate-200 no-print">
+                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Official Medical Transfer Document</span>
                 <div class="flex items-center space-x-2">
-                    <button @click="downloadReferralLetter()" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg text-xs flex items-center space-x-1.5 transition" title="Download Letter as Document">
-                        <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                        <span>Download</span>
+                    <button @click="downloadReferralLetter()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg text-xs flex items-center space-x-1 transition">
+                        <span>⬇ Download</span>
                     </button>
-                    <button onclick="window.print()" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-xs flex items-center space-x-1.5 transition shadow-xs">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                        <span>Print</span>
+                    <button onclick="window.print()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-xs flex items-center space-x-1 transition shadow-xs">
+                        <span>🖨️ Print</span>
                     </button>
-                    <button @click="showTransferSlipModal = false" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg text-xs transition border border-rose-200 ml-1" title="Close (or press Esc)">✕ Close</button>
+                    <button @click="showTransferSlipModal = false" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs flex items-center space-x-1 transition shadow-xs">
+                        <span>✕ Close</span>
+                    </button>
                 </div>
             </div>
 
@@ -830,16 +878,65 @@
                         </div>
                     </div>
 
+                    <!-- SECTION 5: RECEIVING HOSPITAL HANDOVER & COUNTER-REFERRAL OUTCOME -->
+                    <div class="pt-4 border-t-2 border-slate-200 space-y-2">
+                        <div class="flex justify-between items-center">
+                            <p class="font-bold text-xs uppercase tracking-wide text-slate-700">Receiving Hospital Handover & Counter-Referral Record</p>
+                            <template x-if="selectedSlip.handover_report && selectedSlip.handover_report.is_confirmed">
+                                <span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold rounded text-[11px]">✅ Handover Confirmed & Outcome Reported</span>
+                            </template>
+                            <template x-if="!selectedSlip.handover_report || !selectedSlip.handover_report.is_confirmed">
+                                <span class="px-2 py-0.5 bg-amber-100 text-amber-800 font-bold rounded text-[11px]">⏳ Transfer Pending Handover Confirmation</span>
+                            </template>
+                        </div>
+
+                        <!-- If Confirmed -->
+                        <template x-if="selectedSlip.handover_report && selectedSlip.handover_report.is_confirmed">
+                            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 space-y-1.5 text-xs text-slate-800">
+                                <div class="grid grid-cols-2 gap-2">
+                                    <p><b>Receiving Clinician:</b> <span x-text="selectedSlip.handover_report.receiving_officer"></span></p>
+                                    <p><b>Ward / Unit:</b> <span x-text="selectedSlip.handover_report.receiving_ward"></span></p>
+                                    <p><b>Condition on Arrival:</b> <span x-text="selectedSlip.handover_report.arrival_vitals"></span></p>
+                                    <p><b>Handover Outcome:</b> <span class="font-semibold text-emerald-900" x-text="selectedSlip.handover_report.handover_outcome"></span></p>
+                                </div>
+                                <p class="pt-1 border-t border-emerald-200"><b>Clinical Handover Summary / Notes:</b> <span x-text="selectedSlip.handover_report.report_notes"></span></p>
+                                <div class="flex justify-between items-center pt-1 text-[11px] text-emerald-700">
+                                    <span>Confirmed: <b x-text="selectedSlip.handover_report.confirmed_at"></b></span>
+                                    <span>Escort Officer: <b x-text="selectedSlip.handover_report.escort_staff"></b></span>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- If Pending Handover -->
+                        <template x-if="!selectedSlip.handover_report || !selectedSlip.handover_report.is_confirmed">
+                            <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 flex justify-between items-center no-print">
+                                <div class="text-xs text-slate-600">
+                                    <p class="font-semibold text-slate-800">Awaiting arrival verification at <span x-text="selectedSlip.destination_facility"></span>.</p>
+                                    <p class="text-[11px]">Confirm receiving officer, ward admission, and handover outcome to close the transfer loop.</p>
+                                </div>
+                                <button @click="openHandoverModal(selectedSlip.referral_id)" 
+                                        class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs shadow transition">
+                                    📝 Confirm Handover & Report
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+
                     <!-- Bottom Exit & Download Actions (Secondary Exit at Bottom) -->
-                    <div class="pt-5 border-t border-slate-200 flex justify-between items-center no-print">
+                    <div class="pt-5 border-t border-slate-200 flex flex-wrap justify-between items-center gap-2 no-print">
                         <button @click="showTransferSlipModal = false" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg text-xs transition">
                             ← Exit Letter View
                         </button>
                         <div class="flex items-center space-x-2">
+                            <template x-if="!selectedSlip.handover_report || !selectedSlip.handover_report.is_confirmed">
+                                <button @click="openHandoverModal(selectedSlip.referral_id)" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition shadow">
+                                    📝 Confirm Handover & Report
+                                </button>
+                            </template>
                             <button @click="downloadReferralLetter()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg text-xs transition">
                                 ⬇ Download File (.html)
                             </button>
-                            <button @click="showTransferSlipModal = false" class="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-lg text-xs transition">
+                            <button @click="showTransferSlipModal = false" class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs transition shadow">
                                 Done (Close)
                             </button>
                         </div>
@@ -848,6 +945,93 @@
                 </div>
             </template>
 
+        </div>
+    </div>
+
+    <!-- USER REQUEST: TRANSFER HANDOVER CONFIRMATION & COUNTER-REFERRAL REPORTING MODAL -->
+    <div x-show="showReportModal" x-cloak class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div class="max-w-lg w-full bg-white rounded-2xl p-6 space-y-4 shadow-2xl border border-slate-200 my-6">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-200">
+                <div>
+                    <h3 class="font-bold text-sm text-slate-900">Confirm Transfer Handover & Outcome Report</h3>
+                    <p class="text-[11px] text-slate-500">Record receiving hospital admission, attending doctor confirmation, and counter-referral plan.</p>
+                </div>
+                <button @click="showReportModal = false" class="text-slate-400 hover:text-slate-600 p-1 text-lg font-bold">✕</button>
+            </div>
+
+            <!-- Patient & Facility Summary -->
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs flex justify-between items-center">
+                <div>
+                    <p class="font-bold text-slate-900" x-text="reportForm.patient_name"></p>
+                    <p class="text-slate-500" x-text="'Hospital No: ' + reportForm.hospital_number"></p>
+                </div>
+                <div class="text-right">
+                    <span class="text-slate-500 block text-[10px]">Destination Facility:</span>
+                    <b class="text-slate-900" x-text="reportForm.destination_facility"></b>
+                </div>
+            </div>
+
+            <form @submit.prevent="submitHandoverReport" class="space-y-3 text-xs">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Receiving Doctor / Consultant Name <span class="text-rose-600">*</span></label>
+                        <input type="text" x-model="reportForm.receiving_officer" 
+                               placeholder="e.g. Dr. T. O. Alabi, Senior Registrar" 
+                               class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-medium text-slate-900 focus:ring-2 focus:ring-blue-500" required>
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Receiving Ward / Unit <span class="text-rose-600">*</span></label>
+                        <input type="text" x-model="reportForm.receiving_ward" 
+                               placeholder="e.g. Trauma Centre / Ward 4" 
+                               class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-medium text-slate-900 focus:ring-2 focus:ring-blue-500" required>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Handover Outcome Status <span class="text-rose-600">*</span></label>
+                        <select x-model="reportForm.handover_outcome" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-medium text-slate-900 focus:ring-2 focus:ring-blue-500" required>
+                            <option value="Admitted to Inpatient Ward for Surgical Management">Admitted to Inpatient Ward (Surgical)</option>
+                            <option value="Admitted to Intensive Care Unit (ICU)">Admitted to Intensive Care Unit (ICU)</option>
+                            <option value="Emergency Resuscitation & Theatre Transfer">Emergency Theatre Transfer</option>
+                            <option value="Stabilized & Counter-Referred to PHC for Follow-up">Stabilized & Counter-Referred to PHC</option>
+                            <option value="Outpatient Specialist Review Completed">Outpatient Specialist Review Completed</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Arrival Vitals & Condition</label>
+                        <input type="text" x-model="reportForm.arrival_vitals" 
+                               placeholder="e.g. BP: 122/80 mmHg, Pulse: 84 bpm (Stable)" 
+                               class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-medium text-slate-900 focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">PHC Escort / Reporting Clinician</label>
+                    <input type="text" x-model="reportForm.escort_staff" 
+                           placeholder="e.g. Nurse Folake Adeyemi (Ambulance Lead)" 
+                           class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-medium text-slate-900 focus:ring-2 focus:ring-blue-500" required>
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Clinical Handover Summary & Counter-Referral Plan <span class="text-rose-600">*</span></label>
+                    <textarea x-model="reportForm.notes" rows="3" 
+                              placeholder="Describe patient handover, physical inspection findings at receiving center, treatment initiated, and post-discharge counter-referral instructions for the PHC..." 
+                              class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-medium text-slate-900 focus:ring-2 focus:ring-blue-500" required></textarea>
+                </div>
+
+                <div class="flex justify-end space-x-2 pt-2 border-t border-slate-200">
+                    <button type="button" @click="showReportModal = false" class="px-4 py-2 border border-slate-300 text-slate-700 font-semibold rounded-xl hover:bg-slate-50 transition">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow transition flex items-center space-x-1.5">
+                        <span>✅</span>
+                        <span>Confirm Handover & Save Report</span>
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -1124,18 +1308,28 @@
                     </div>
 
                     <div>
-                        <label class="block font-semibold text-slate-700 mb-1">Destination Hospital Name</label>
-                        <input type="text" x-model="referralForm.destination_facility" list="hospitalOptions" 
-                               placeholder="e.g. University College Hospital (UCH) Ibadan" 
-                               class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800" required>
-                        <datalist id="hospitalOptions">
-                            <option value="University College Hospital (UCH) Ibadan">
-                            <option value="Adeoyo Maternity Teaching Hospital, Yemetu">
-                            <option value="State Hospital Ring Road Ibadan">
-                            <option value="Jericho Specialist Hospital Ibadan">
-                            <option value="Our Lady of Apostles Catholic Hospital Oluyoro">
-                        </datalist>
+                        <label class="block font-semibold text-slate-700 mb-1">
+                            Destination Hospital (Nearest Hospitals) <span class="text-rose-600">*</span>
+                        </label>
+                        <select x-model="referralForm.destination_facility" 
+                                class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-medium text-slate-800 focus:ring-2 focus:ring-blue-500" required>
+                            <option value="University College Hospital (UCH) Ibadan">University College Hospital (UCH) Ibadan — 12 km (Tertiary Trauma & Surgery)</option>
+                            <option value="Adeoyo Maternity Teaching Hospital, Yemetu">Adeoyo Maternity Teaching Hospital, Yemetu — 8 km (Maternity & Neonatal Care)</option>
+                            <option value="State Hospital Ring Road Ibadan">State Hospital Ring Road Ibadan — 14 km (Secondary General Surgery & Pediatrics)</option>
+                            <option value="Jericho Specialist Hospital Ibadan">Jericho Specialist Hospital Ibadan — 10 km (Specialist Internal Medicine)</option>
+                            <option value="Our Lady of Apostles Catholic Hospital Oluyoro">Our Lady of Apostles Catholic Hospital Oluyoro — 9 km (Secondary Emergency)</option>
+                            <option value="St. Mary's Catholic Hospital, Eleta">St. Mary's Catholic Hospital, Eleta — 11 km (Inpatient Surgery & General Care)</option>
+                            <option value="OTHER">Other Referral Hospital / Specialist Facility (Specify Below)...</option>
+                        </select>
                     </div>
+                </div>
+
+                <!-- Custom Hospital Name field if OTHER is chosen -->
+                <div x-show="referralForm.destination_facility === 'OTHER'" x-cloak class="p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                    <label class="block font-semibold text-slate-700 mb-1">Specify Custom Hospital / Facility Name <span class="text-rose-600">*</span></label>
+                    <input type="text" x-model="referralForm.custom_destination" 
+                           placeholder="Enter destination hospital name (e.g. Baptist Medical Centre, Ogbomoso)" 
+                           class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-medium text-slate-800">
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1329,6 +1523,7 @@
                 showReferralModal: false,
                 showRegisterModal: false,
                 showTransferSlipModal: false,
+                showReportModal: false,
                 showAdmitModal: false,
                 showWardNoteModal: false,
                 showDischargeModal: false,
@@ -1342,6 +1537,20 @@
                 activeAdmissionForAction: null,
                 wardNoteText: '',
                 dischargeSummary: '',
+
+                // Transfer Handover Reporting Form
+                reportForm: {
+                    referral_id: null,
+                    patient_name: '',
+                    hospital_number: '',
+                    destination_facility: '',
+                    receiving_officer: 'Dr. T. O. Alabi, Senior Registrar',
+                    receiving_ward: 'Trauma Centre / Ward 4',
+                    arrival_vitals: 'BP: 122/80 mmHg, Pulse: 84 bpm (Stable in transit)',
+                    handover_outcome: 'Admitted to Inpatient Ward for Surgical Management',
+                    notes: 'Patient received safely via ambulance. Plaster splint verified intact with adequate peripheral perfusion. Admitted for open reduction & internal fixation. Counter-referral discharge summary will be transmitted back to PHC.',
+                    escort_staff: 'Nurse Folake Adeyemi (Ambulance Lead)'
+                },
 
                 // Investigation Orders
                 selectedTestToOrder: 'Malaria Rapid Diagnostic Test (mRDT)',
@@ -1371,6 +1580,7 @@
                     patient_id: '', 
                     origin_facility: 'Alakia Primary Healthcare Centre',
                     destination_facility: 'University College Hospital (UCH) Ibadan', 
+                    custom_destination: '',
                     referring_doctor: 'Dr. Kemi Sanni, MBBS, MPH',
                     urgency: 'Emergency Transfer', 
                     provisional_diagnosis: '',
@@ -1647,10 +1857,18 @@
                         if (!this.token) {
                             await this.quickLogin('PHC/26/MED/001');
                         }
+                        let dest = this.referralForm.destination_facility;
+                        if (dest === 'OTHER') {
+                            dest = this.referralForm.custom_destination || 'Specialist Referral Hospital';
+                        }
+                        const payload = {
+                            ...this.referralForm,
+                            destination_facility: dest
+                        };
                         const res = await fetch('/api/referrals', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
-                            body: JSON.stringify(this.referralForm)
+                            body: JSON.stringify(payload)
                         });
                         if (res.ok) {
                             const data = await res.json();
@@ -1668,6 +1886,63 @@
                         }
                     } catch(e) {
                         this.showToast("Referral issuance failed: " + e.message);
+                    }
+                },
+
+                // USER REQUEST: CONFIRMED TRANSFER HANDOVER & COUNTER-REFERRAL REPORTING
+                openHandoverModal(refId) {
+                    let ref = this.referrals.find(r => r.id === refId);
+                    if (!ref && this.selectedSlip && this.selectedSlip.referral_id === refId) {
+                        ref = {
+                            id: this.selectedSlip.referral_id,
+                            patient_name: this.selectedSlip.patient.name,
+                            folder_number: this.selectedSlip.patient.hospital_number,
+                            destination_facility: this.selectedSlip.destination_facility
+                        };
+                    }
+                    if (!ref) return;
+                    this.reportForm.referral_id = ref.id;
+                    this.reportForm.patient_name = ref.patient_name || 'Patient';
+                    this.reportForm.hospital_number = ref.folder_number || ref.patient_id || '';
+                    this.reportForm.destination_facility = ref.destination_facility;
+                    this.reportForm.escort_staff = this.staffName ? `${this.staffName} (PHC Escort)` : 'Nurse Folake Adeyemi (Ambulance Lead)';
+                    this.showReportModal = true;
+                },
+
+                async submitHandoverReport() {
+                    try {
+                        if (!this.token) {
+                            await this.quickLogin('PHC/26/MED/001');
+                        }
+                        const refId = this.reportForm.referral_id;
+                        const payload = {
+                            status: 'Handover Confirmed & Reported',
+                            receiving_officer: this.reportForm.receiving_officer,
+                            receiving_facility: this.reportForm.destination_facility,
+                            receiving_ward: this.reportForm.receiving_ward,
+                            handover_outcome: this.reportForm.handover_outcome,
+                            arrival_vitals: this.reportForm.arrival_vitals,
+                            escort_staff: this.reportForm.escort_staff,
+                            notes: this.reportForm.notes
+                        };
+                        const res = await fetch(`/api/referrals/${refId}/status`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                            body: JSON.stringify(payload)
+                        });
+                        if (res.ok) {
+                            this.showToast("Handover report confirmed and logged!");
+                            this.showReportModal = false;
+                            await this.fetchReferrals();
+                            if (this.showTransferSlipModal && this.selectedSlip && this.selectedSlip.referral_id === refId) {
+                                await this.openTransferSlipModal(refId);
+                            }
+                        } else {
+                            const err = await res.json().catch(() => ({}));
+                            this.showToast(err.detail || "Failed to submit handover report.");
+                        }
+                    } catch(e) {
+                        this.showToast("Error submitting handover report: " + e.message);
                     }
                 },
 
@@ -1695,6 +1970,23 @@
                 downloadReferralLetter() {
                     if (!this.selectedSlip) return;
                     const slip = this.selectedSlip;
+                    let handoverHtml = '';
+                    if (slip.handover_report && slip.handover_report.is_confirmed) {
+                        handoverHtml = `
+    <div style="margin-top: 24px; padding: 12px; border: 2px solid #059669; border-radius: 6px; background: #ecfdf5;">
+        <div style="font-weight: bold; color: #065f46; font-size: 13px; margin-bottom: 6px;">
+            RECEIVING HOSPITAL HANDOVER CONFIRMATION & COUNTER-REFERRAL RECORD
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin: 4px 0;">
+            <tr><td style="padding: 4px; border: none;"><strong>Receiving Clinician:</strong> ${slip.handover_report.receiving_officer}</td>
+                <td style="padding: 4px; border: none;"><strong>Ward / Unit:</strong> ${slip.handover_report.receiving_ward}</td></tr>
+            <tr><td style="padding: 4px; border: none;"><strong>Arrival Vitals:</strong> ${slip.handover_report.arrival_vitals}</td>
+                <td style="padding: 4px; border: none;"><strong>Outcome:</strong> ${slip.handover_report.handover_outcome}</td></tr>
+        </table>
+        <div style="margin-top: 6px; font-size: 12px; color: #1f2937;"><strong>Handover Notes:</strong> ${slip.handover_report.report_notes}</div>
+        <div style="margin-top: 6px; font-size: 11px; color: #047857;">Confirmed: ${slip.handover_report.confirmed_at} | Escort: ${slip.handover_report.escort_staff}</div>
+    </div>`;
+                    }
                     const content = `<!DOCTYPE html>
 <html>
 <head>
@@ -1758,6 +2050,7 @@
         ${slip.facility_origin.name}<br>
         <small>Official Facility Stamp / Verified Clinical Record</small>
     </div>
+    ${handoverHtml}
 </body>
 </html>`;
                     const blob = new Blob([content], { type: 'text/html' });
