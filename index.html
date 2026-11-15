@@ -713,26 +713,36 @@
 
     <!-- ==================== MODALS ==================== -->
 
-    <!-- USER REQUEST: OFFICIAL PHYSICIAN CLINICAL REFERRAL LETTER (UNIFORM FONT SIZE, NO AI ESSAYS, DOWNLOAD & PRINT) -->
-    <div x-show="showTransferSlipModal" x-cloak class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-        <div class="max-w-2xl w-full bg-white rounded-2xl p-6 sm:p-8 space-y-5 shadow-2xl my-6 relative border border-slate-200" id="printableSlip">
+    <!-- USER REQUEST: OFFICIAL PHYSICIAN CLINICAL REFERRAL LETTER (FIXED TOP ACTIONS, UNIFORM FONT SIZE, DOWNLOAD & PROMINENT '✕') -->
+    <div x-show="showTransferSlipModal" 
+         @click.self="showTransferSlipModal = false"
+         @keydown.escape.window="showTransferSlipModal = false"
+         x-cloak 
+         class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm overflow-y-auto p-3 sm:p-6 flex justify-center items-start">
+        
+        <!-- Persistent Floating Close Button (ALWAYS VISIBLE AT TOP-RIGHT OF SCREEN) -->
+        <button @click="showTransferSlipModal = false" 
+                class="fixed top-4 right-4 z-[70] bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-600 border border-slate-300 rounded-full w-10 h-10 flex items-center justify-center shadow-2xl font-bold text-lg transition no-print" 
+                title="Exit Letter (or press Esc)">✕</button>
+
+        <div class="max-w-2xl w-full bg-white rounded-2xl p-6 sm:p-8 space-y-5 shadow-2xl my-4 relative border border-slate-200" id="printableSlip">
             
-            <!-- Top Controls (Back, Download, Print & Prominent Close '✕') -->
-            <div class="flex justify-between items-center border-b border-slate-200 pb-3 no-print">
-                <button @click="showTransferSlipModal = false" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-xl text-xs flex items-center space-x-1.5 transition">
+            <!-- Sticky Top Header Controls (Back, Download, Print & Close '✕') -->
+            <div class="sticky -top-6 sm:-top-8 z-30 bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center -mx-6 sm:-mx-8 -mt-6 sm:-mt-8 mb-4 rounded-t-2xl shadow-xs no-print">
+                <button @click="showTransferSlipModal = false" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg text-xs flex items-center space-x-1.5 transition">
                     <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                     <span>Back to Referrals</span>
                 </button>
                 <div class="flex items-center space-x-2">
-                    <button @click="downloadReferralLetter()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-xl text-xs flex items-center space-x-1.5 transition" title="Download Letter as HTML/Document">
+                    <button @click="downloadReferralLetter()" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg text-xs flex items-center space-x-1.5 transition" title="Download Letter as Document">
                         <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                         <span>Download</span>
                     </button>
-                    <button onclick="window.print()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl text-xs flex items-center space-x-1.5 transition shadow-xs">
+                    <button onclick="window.print()" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-xs flex items-center space-x-1.5 transition shadow-xs">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                         <span>Print</span>
                     </button>
-                    <button @click="showTransferSlipModal = false" class="text-slate-400 hover:text-slate-700 p-2 rounded-xl text-lg font-bold transition ml-1" title="Close">✕</button>
+                    <button @click="showTransferSlipModal = false" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg text-xs transition border border-rose-200 ml-1" title="Close (or press Esc)">✕ Close</button>
                 </div>
             </div>
 
@@ -811,12 +821,27 @@
                     </div>
 
                     <!-- Sign-off -->
-                    <div class="pt-6 space-y-1 text-sm">
+                    <div class="pt-4 space-y-1 text-sm">
                         <p>Yours faithfully,</p>
-                        <div class="pt-4">
+                        <div class="pt-2">
                             <p class="font-bold text-slate-900" x-text="selectedSlip.referred_by.name"></p>
                             <p class="text-slate-700" x-text="selectedSlip.facility_origin.name"></p>
                             <p class="text-xs text-slate-500 pt-0.5">Official Facility Stamp / Verified Clinical Record</p>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Exit & Download Actions (Secondary Exit at Bottom) -->
+                    <div class="pt-5 border-t border-slate-200 flex justify-between items-center no-print">
+                        <button @click="showTransferSlipModal = false" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg text-xs transition">
+                            ← Exit Letter View
+                        </button>
+                        <div class="flex items-center space-x-2">
+                            <button @click="downloadReferralLetter()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg text-xs transition">
+                                ⬇ Download File (.html)
+                            </button>
+                            <button @click="showTransferSlipModal = false" class="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-lg text-xs transition">
+                                Done (Close)
+                            </button>
                         </div>
                     </div>
 
