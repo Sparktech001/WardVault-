@@ -322,185 +322,160 @@
                 <!-- TAB 1: PATIENT FILING CABINETS & FOLDERS (DE-NOISED & PAGINATED) -->
                 <div x-show="currentTab === 'census'" x-cloak class="space-y-5">
                     
-                    <!-- FOLDER DRAWER VIEW: WHEN NO FOLDER IS OPENED YET -->
-                    <template x-if="!activeFolder">
-                        <div class="space-y-4">
-                            <div class="flex flex-wrap items-center justify-between gap-3">
-                                <div>
-                                    <h2 class="text-base font-bold text-slate-900">Physical Clinic Filing Cabinets</h2>
-                                    <p class="text-xs text-slate-500">Patient folders organized by clinical care department. Click a cabinet to browse folders.</p>
-                                </div>
-                                <button @click="showRegisterModal = true" class="px-4 py-2 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-bold text-xs transition shadow-sm flex items-center space-x-1.5">
-                                    <span>+</span>
-                                    <span>Register New Outpatient</span>
-                                </button>
+                    <!-- Header Bar with Register Button -->
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-base font-bold text-slate-900">Patient Records & Filing Cabinets</h2>
+                            <p class="text-xs text-slate-500">Filter by clinical cabinet or jump alphabetically (A–Z) by patient name.</p>
+                        </div>
+                        <button @click="showRegisterModal = true" class="px-4 py-2 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-bold text-xs transition shadow-sm flex items-center space-x-1.5">
+                            <span>+</span>
+                            <span>Register New Outpatient</span>
+                        </button>
+                    </div>
+
+                    <!-- 5 Department Cabinet Tabs -->
+                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs font-bold">
+                        <button @click="activeFolder = 'ALL'; currentPage = 1" class="p-3 rounded-2xl border text-left transition flex items-center justify-between"
+                            :class="activeFolder === 'ALL' || !activeFolder ? 'bg-brand-50 border-brand-500 text-brand-900 shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-lg">🗂️</span>
+                                <span>All Folders</span>
                             </div>
+                            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white border border-slate-200" x-text="patients.length"></span>
+                        </button>
 
-                            <!-- 4 Department Filing Drawers Grid -->
-                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                
-                                <!-- Drawer 1: ANC -->
-                                <button @click="openFolderDrawer('ANC')" class="soft-card rounded-2xl p-5 text-left space-y-3 hover:border-brand-400 hover:shadow-md transition group">
-                                    <div class="flex justify-between items-center">
-                                        <div class="h-12 w-12 rounded-2xl bg-brand-50 text-brand-700 flex items-center justify-center text-2xl group-hover:scale-105 transition">
-                                            🤰
-                                        </div>
-                                        <span class="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-brand-50 text-brand-800 border border-brand-200" x-text="getFolderPatients('ANC').length + ' Folders'"></span>
-                                    </div>
-                                    <div>
-                                        <h3 class="font-extrabold text-sm text-slate-900 group-hover:text-brand-700 transition">ANC Clinic Drawer</h3>
-                                        <p class="text-[11px] text-slate-400">Antenatal Care, Maternal health & gestational tracking</p>
-                                    </div>
-                                    <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold text-brand-700">
-                                        <span>Open Cabinet</span>
-                                        <span>→</span>
-                                    </div>
+                        <button @click="activeFolder = 'ANC'; currentPage = 1" class="p-3 rounded-2xl border text-left transition flex items-center justify-between"
+                            :class="activeFolder === 'ANC' ? 'bg-brand-50 border-brand-500 text-brand-900 shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-lg">🤰</span>
+                                <span>ANC Clinic</span>
+                            </div>
+                            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white border border-slate-200" x-text="getFolderPatients('ANC').length"></span>
+                        </button>
+
+                        <button @click="activeFolder = 'MED'; currentPage = 1" class="p-3 rounded-2xl border text-left transition flex items-center justify-between"
+                            :class="activeFolder === 'MED' ? 'bg-blue-50 border-blue-500 text-blue-900 shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-lg">🩺</span>
+                                <span>OPD (MED)</span>
+                            </div>
+                            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white border border-slate-200" x-text="getFolderPatients('MED').length"></span>
+                        </button>
+
+                        <button @click="activeFolder = 'EPI'; currentPage = 1" class="p-3 rounded-2xl border text-left transition flex items-center justify-between"
+                            :class="activeFolder === 'EPI' ? 'bg-amber-50 border-amber-500 text-amber-900 shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-lg">👶</span>
+                                <span>EPI / Child</span>
+                            </div>
+                            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white border border-slate-200" x-text="getFolderPatients('EPI').length"></span>
+                        </button>
+
+                        <button @click="activeFolder = 'FL'; currentPage = 1" class="p-3 rounded-2xl border text-left transition flex items-center justify-between col-span-2 sm:col-span-1"
+                            :class="activeFolder === 'FL' ? 'bg-purple-50 border-purple-500 text-purple-900 shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-lg">📁</span>
+                                <span>FL-1000 Series</span>
+                            </div>
+                            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white border border-slate-200" x-text="getFolderPatients('FL').length"></span>
+                        </button>
+                    </div>
+
+                    <!-- Search and A-Z Alphabetical Quick Jump Filter -->
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200/80 space-y-3">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div class="flex-1 min-w-[220px]">
+                                <input type="text" x-model="searchQuery" @input="currentPage = 1"
+                                    placeholder="🔍 Filter by patient first name, surname, or folder number..."
+                                    class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-brand-500 font-medium">
+                            </div>
+                            <div class="flex items-center space-x-2 text-xs">
+                                <span class="text-slate-500 font-bold" x-text="folderFilteredPatients.length + ' Matches Found'"></span>
+                                <button x-show="folderAlpha || searchQuery || (activeFolder && activeFolder !== 'ALL')" @click="folderAlpha = ''; searchQuery = ''; activeFolder = 'ALL'; currentPage = 1" class="text-rose-600 hover:underline text-[11px] font-bold">
+                                    Clear All Filters
                                 </button>
-
-                                <!-- Drawer 2: General OPD (MED) -->
-                                <button @click="openFolderDrawer('MED')" class="soft-card rounded-2xl p-5 text-left space-y-3 hover:border-blue-400 hover:shadow-md transition group">
-                                    <div class="flex justify-between items-center">
-                                        <div class="h-12 w-12 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center text-2xl group-hover:scale-105 transition">
-                                            🩺
-                                        </div>
-                                        <span class="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-800 border border-blue-200" x-text="getFolderPatients('MED').length + ' Folders'"></span>
-                                    </div>
-                                    <div>
-                                        <h3 class="font-extrabold text-sm text-slate-900 group-hover:text-blue-700 transition">OPD General Clinic</h3>
-                                        <p class="text-[11px] text-slate-400">Adult Outpatient triage, acute fevers & malaria</p>
-                                    </div>
-                                    <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold text-blue-700">
-                                        <span>Open Cabinet</span>
-                                        <span>→</span>
-                                    </div>
-                                </button>
-
-                                <!-- Drawer 3: EPI / Pediatric -->
-                                <button @click="openFolderDrawer('EPI')" class="soft-card rounded-2xl p-5 text-left space-y-3 hover:border-amber-400 hover:shadow-md transition group">
-                                    <div class="flex justify-between items-center">
-                                        <div class="h-12 w-12 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center text-2xl group-hover:scale-105 transition">
-                                            👶
-                                        </div>
-                                        <span class="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200" x-text="getFolderPatients('EPI').length + ' Folders'"></span>
-                                    </div>
-                                    <div>
-                                        <h3 class="font-extrabold text-sm text-slate-900 group-hover:text-amber-700 transition">EPI & Pediatrics</h3>
-                                        <p class="text-[11px] text-slate-400">Childhood routine immunization & growth charts</p>
-                                    </div>
-                                    <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold text-amber-700">
-                                        <span>Open Cabinet</span>
-                                        <span>→</span>
-                                    </div>
-                                </button>
-
-                                <!-- Drawer 4: Chronic / F-Series -->
-                                <button @click="openFolderDrawer('CHRONIC')" class="soft-card rounded-2xl p-5 text-left space-y-3 hover:border-purple-400 hover:shadow-md transition group">
-                                    <div class="flex justify-between items-center">
-                                        <div class="h-12 w-12 rounded-2xl bg-purple-50 text-purple-700 flex items-center justify-center text-2xl group-hover:scale-105 transition">
-                                            📋
-                                        </div>
-                                        <span class="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-800 border border-purple-200" x-text="getFolderPatients('CHRONIC').length + ' Folders'"></span>
-                                    </div>
-                                    <div>
-                                        <h3 class="font-extrabold text-sm text-slate-900 group-hover:text-purple-700 transition">Chronic Care (F-Series)</h3>
-                                        <p class="text-[11px] text-slate-400">Hypertension, diabetes & continuous medication</p>
-                                    </div>
-                                    <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold text-purple-700">
-                                        <span>Open Cabinet</span>
-                                        <span>→</span>
-                                    </div>
-                                </button>
-
                             </div>
                         </div>
-                    </template>
 
-                    <!-- OPEN DRAWER VIEW (PAGINATED AT 10 PATIENTS PER VIEW) -->
-                    <template x-if="activeFolder">
-                        <div class="space-y-4">
-                            
-                            <div class="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/80">
-                                <div class="flex items-center space-x-3">
-                                    <button @click="activeFolder = null" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition">
-                                        ← Back to Cabinets
-                                    </button>
-                                    <div>
-                                        <h3 class="font-bold text-sm text-slate-900" x-text="getFolderName(activeFolder) + ' (' + folderFilteredPatients.length + ' Total Folders)'"></h3>
-                                        <p class="text-[11px] text-slate-400">Showing maximum 10 folders per page</p>
-                                    </div>
-                                </div>
+                        <!-- Alphabetical (A-Z) Filter Pill Bar -->
+                        <div class="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1 text-[11px] font-bold">
+                            <span class="text-slate-400 mr-1 text-[10px] uppercase tracking-wider">Name:</span>
+                            <button @click="folderAlpha = ''; currentPage = 1" class="px-2.5 py-1 rounded-lg transition"
+                                :class="folderAlpha === '' ? 'bg-brand-700 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'">
+                                ALL
+                            </button>
+                            <template x-for="char in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')" :key="char">
+                                <button @click="folderAlpha = char; currentPage = 1" class="w-6 h-6 rounded-lg transition flex items-center justify-center text-[10px]"
+                                    :class="folderAlpha === char ? 'bg-brand-700 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                                    x-text="char">
+                                </button>
+                            </template>
+                        </div>
+                    </div>
 
-                                <!-- Alphabetical Filter Pills -->
-                                <div class="hidden sm:flex items-center space-x-1 text-[10px] font-bold text-slate-400">
-                                    <button @click="folderAlpha = ''" class="px-2 py-1 rounded" :class="folderAlpha === '' ? 'bg-brand-500 text-white' : 'hover:text-slate-800'">ALL</button>
-                                    <template x-for="char in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')" :key="char">
-                                        <button @click="folderAlpha = char; currentPage = 1" class="px-1.5 py-1 rounded" :class="folderAlpha === char ? 'bg-brand-500 text-white' : 'hover:text-slate-800'" x-text="char"></button>
+                    <!-- Paginated Patients Table (STRICT 10 PER PAGE) -->
+                    <div class="soft-card rounded-2xl overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                        <th class="px-5 py-3.5">Folder #</th>
+                                        <th class="px-5 py-3.5">Patient Name</th>
+                                        <th class="px-5 py-3.5">Demographics</th>
+                                        <th class="px-5 py-3.5">Blood / Genotype</th>
+                                        <th class="px-5 py-3.5">Clinic Condition</th>
+                                        <th class="px-5 py-3.5 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <template x-if="paginatedFolderPatients.length === 0">
+                                        <tr>
+                                            <td colspan="6" class="px-5 py-10 text-center text-slate-400">
+                                                <p class="font-bold text-slate-600 text-sm">No patient records match the selected filter.</p>
+                                                <p class="text-xs text-slate-400 mt-1">Try selecting a different letter or clearing the search query.</p>
+                                            </td>
+                                        </tr>
                                     </template>
-                                </div>
-                            </div>
-
-                            <!-- Paginated Table -->
-                            <div class="soft-card rounded-2xl overflow-hidden">
-                                <div class="overflow-x-auto">
-                                    <table class="w-full text-left text-xs border-collapse">
-                                        <thead>
-                                            <tr class="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                                                <th class="px-5 py-3.5">Folder #</th>
-                                                <th class="px-5 py-3.5">Patient Name</th>
-                                                <th class="px-5 py-3.5">Demographics</th>
-                                                <th class="px-5 py-3.5">Blood / Genotype</th>
-                                                <th class="px-5 py-3.5">Primary Condition</th>
-                                                <th class="px-5 py-3.5 text-right">Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-slate-100">
-                                            <template x-if="paginatedFolderPatients.length === 0">
-                                                <tr>
-                                                    <td colspan="6" class="px-5 py-8 text-center text-slate-400">No patient folders found in this letter range.</td>
-                                                </tr>
-                                            </template>
-                                            <template x-for="p in paginatedFolderPatients" :key="p.id">
-                                                <tr class="hover:bg-slate-50/70 transition">
-                                                    <td class="px-5 py-3.5">
-                                                        <span class="font-bold font-mono text-brand-800 block" x-text="p.folder_number || p.id"></span>
-                                                        <span class="text-[10px] text-slate-400 font-mono" x-text="p.nin ? 'NIN: ' + p.nin : 'Physical Folder'"></span>
-                                                    </td>
-                                                    <td class="px-5 py-3.5 font-bold text-slate-900" x-text="cleanName(p.first, p.last)"></td>
-                                                    <td class="px-5 py-3.5 text-slate-600">
-                                                        <span x-text="p.age + ' yrs'"></span> • <span x-text="p.gender === 'F' ? 'Female' : 'Male'"></span>
-                                                    </td>
-                                                    <td class="px-5 py-3.5">
-                                                        <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700" x-text="(p.blood_group || 'O+') + ' / ' + (p.genotype || 'AA')"></span>
-                                                    </td>
-                                                    <td class="px-5 py-3.5 text-slate-600" x-text="p.condition || 'Primary Outpatient'"></td>
-                                                    <td class="px-5 py-3.5 text-right">
-                                                        <button @click="selectPatient(p.id)" class="px-3.5 py-1.5 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-800 font-bold text-[11px] border border-brand-200 transition">
-                                                            Start Consult →
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            </template>
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                <!-- Pagination Bar (Strict 10 items) -->
-                                <div class="p-4 bg-slate-50 border-t border-slate-100 flex flex-wrap justify-between items-center text-xs">
-                                    <span class="text-slate-500 font-medium" x-text="'Showing ' + ((currentPage - 1) * 10 + 1) + ' - ' + Math.min(currentPage * 10, folderFilteredPatients.length) + ' of ' + folderFilteredPatients.length + ' folders'"></span>
-                                    <div class="flex items-center space-x-2">
-                                        <button @click="if(currentPage > 1) currentPage--" :disabled="currentPage === 1" class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 font-bold disabled:opacity-40">
-                                            Previous
-                                        </button>
-                                        <span class="px-3 py-1.5 font-bold font-mono text-slate-700" x-text="'Page ' + currentPage + ' of ' + Math.max(1, Math.ceil(folderFilteredPatients.length / 10))"></span>
-                                        <button @click="if(currentPage < Math.ceil(folderFilteredPatients.length / 10)) currentPage++" :disabled="currentPage >= Math.ceil(folderFilteredPatients.length / 10)" class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 font-bold disabled:opacity-40">
-                                            Next
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
+                                    <template x-for="p in paginatedFolderPatients" :key="p.id">
+                                        <tr class="hover:bg-slate-50/70 transition">
+                                            <td class="px-5 py-3.5">
+                                                <span class="font-bold font-mono text-brand-800 block" x-text="p.folder_number || p.id"></span>
+                                                <span class="text-[10px] text-slate-400 font-mono" x-text="p.nin ? 'NIN: ' + p.nin : 'Physical Folder'"></span>
+                                            </td>
+                                            <td class="px-5 py-3.5 font-bold text-slate-900 text-sm" x-text="cleanName(p)"></td>
+                                            <td class="px-5 py-3.5 text-slate-600">
+                                                <span x-text="p.age + ' yrs'"></span> • <span x-text="p.gender === 'F' ? 'Female' : 'Male'"></span>
+                                            </td>
+                                            <td class="px-5 py-3.5">
+                                                <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700" x-text="(p.blood_group || 'O+') + ' / ' + (p.genotype || 'AA')"></span>
+                                            </td>
+                                            <td class="px-5 py-3.5 text-slate-600 max-w-xs truncate" x-text="p.condition || 'General Outpatient'"></td>
+                                            <td class="px-5 py-3.5 text-right">
+                                                <button @click="selectPatient(p.id)" class="px-3.5 py-1.5 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-800 font-bold text-[11px] border border-brand-200 transition">
+                                                    Start Consult →
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
                         </div>
-                    </template>
+
+                        <!-- Pagination Bar (Strict 10 items) -->
+                        <div class="p-4 bg-slate-50 border-t border-slate-100 flex flex-wrap justify-between items-center text-xs">
+                            <span class="text-slate-500 font-medium" x-text="'Showing ' + (folderFilteredPatients.length === 0 ? 0 : (currentPage - 1) * 10 + 1) + ' - ' + Math.min(currentPage * 10, folderFilteredPatients.length) + ' of ' + folderFilteredPatients.length + ' records'"></span>
+                            <div class="flex items-center space-x-2">
+                                <button @click="if(currentPage > 1) currentPage--" :disabled="currentPage === 1" class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 font-bold disabled:opacity-40 transition hover:bg-slate-100">
+                                    Previous
+                                </button>
+                                <span class="px-3 py-1.5 font-bold font-mono text-slate-700" x-text="'Page ' + currentPage + ' of ' + Math.max(1, Math.ceil(folderFilteredPatients.length / 10))"></span>
+                                <button @click="if(currentPage < Math.ceil(folderFilteredPatients.length / 10)) currentPage++" :disabled="currentPage >= Math.ceil(folderFilteredPatients.length / 10)" class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 font-bold disabled:opacity-40 transition hover:bg-slate-100">
+                                    Next
+                                </button>
+                            </div>
+                        </div>
+                    </div>
 
                 </div>
 
@@ -527,8 +502,8 @@
                                     </div>
                                     <div>
                                         <div class="flex items-center space-x-2">
-                                            <h3 class="text-base font-extrabold text-slate-900" x-text="cleanName(activePatient.first, activePatient.last)"></h3>
-                                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-100 text-brand-800" x-text="activePatient.folder_number"></span>
+                                            <h3 class="text-base font-extrabold text-slate-900" x-text="cleanName(activePatient)"></h3>
+                                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-100 text-brand-800" x-text="activePatient.folder_number || activePatient.ward_id"></span>
                                         </div>
                                         <p class="text-xs text-slate-500 font-medium">
                                             <span x-text="activePatient.age + ' years old'"></span> • 
@@ -665,7 +640,7 @@
                                     </span>
                                 </div>
                                 <div class="text-xs space-y-1">
-                                    <p><strong>Patient Name:</strong> <span x-text="cleanName(item.first, item.last)"></span></p>
+                                    <p><strong>Patient Name:</strong> <span class="font-bold text-slate-800" x-text="cleanName(item)"></span></p>
                                     <p><strong>Demographics:</strong> <span x-text="item.age + ' yrs, ' + item.gender"></span></p>
                                     <p class="text-slate-500"><strong>Flag Reason:</strong> <span x-text="item.review_notes || 'Handwriting illegible on allergies card'"></span></p>
                                 </div>
@@ -899,7 +874,7 @@
             return {
                 token: null, staffName: '', role: '', username: '', password: 'password123', providerId: '', onDuty: true,
                 currentTab: 'census',
-                activeFolder: null, // 'ANC', 'MED', 'EPI', 'CHRONIC'
+                activeFolder: 'ALL', // 'ALL', 'ANC', 'MED', 'EPI', 'FL'
                 currentPage: 1,
                 folderAlpha: '',
                 authError: '', accessError: '', loading: false,
@@ -962,10 +937,16 @@
                     setTimeout(() => { if (this.toastMessage === msg) this.toastMessage = ''; }, 4000);
                 },
 
-                cleanName(first, last) {
-                    const f = (first || '').replace(/\d+/g, '').trim();
-                    const l = (last || '').replace(/\d+/g, '').trim();
-                    return `${f} ${l}`.trim() || 'Outpatient';
+                cleanName(item, last) {
+                    if (!item) return 'Patient';
+                    let raw = '';
+                    if (typeof item === 'object') {
+                        raw = item.name || `${item.first || ''} ${item.last || ''}`.trim() || item.id || '';
+                    } else {
+                        raw = `${item || ''} ${last || ''}`.trim();
+                    }
+                    const cleaned = raw.replace(/\d+/g, '').replace(/\s+/g, ' ').trim();
+                    return cleaned || 'Patient';
                 },
 
                 // Power & Battery Simulation Logic
@@ -1005,42 +986,61 @@
 
                 getFolderName(key) {
                     const names = {
+                        'ALL': 'All Patient Folders',
                         'ANC': 'Antenatal Care (ANC) Clinic Drawer',
                         'MED': 'General Outpatient (OPD MED) Drawer',
                         'EPI': 'Immunization & Pediatrics (EPI) Drawer',
-                        'CHRONIC': 'Chronic Care (F-Series) Drawer'
+                        'FL': 'FL-1000 Patient Series Drawer'
                     };
-                    return names[key] || 'General Filing Drawer';
+                    return names[key] || 'Patient Filing Drawer';
                 },
 
                 getFolderPatients(folderKey) {
+                    if (!folderKey || folderKey === 'ALL') return this.patients;
                     return this.patients.filter(p => {
                         const cond = (p.condition || '').toLowerCase();
-                        const folder = (p.folder_number || '').toUpperCase();
+                        const folder = (p.folder_number || p.id || '').toUpperCase();
                         const age = Number(p.age) || 30;
 
                         if (folderKey === 'ANC') {
                             return folder.startsWith('ANC') || cond.includes('antenatal') || cond.includes('pregnan') || (p.gender === 'F' && age >= 18 && age <= 42 && cond.includes('maternal'));
                         } else if (folderKey === 'EPI') {
-                            return age <= 5 || cond.includes('immun') || cond.includes('pediatric') || cond.includes('vaccine');
-                        } else if (folderKey === 'CHRONIC') {
-                            return folder.startsWith('F') || cond.includes('hyper') || cond.includes('diabet') || cond.includes('chronic');
-                        } else {
-                            // MED / General OPD
-                            return !folder.startsWith('ANC') && !folder.startsWith('F') && age > 5;
+                            return folder.startsWith('IMM') || age <= 5 || cond.includes('immun') || cond.includes('pediatric') || cond.includes('vaccine') || cond.includes('malnutrition');
+                        } else if (folderKey === 'FL') {
+                            return folder.startsWith('FL') || folder.startsWith('F-') || folder.startsWith('F1');
+                        } else if (folderKey === 'MED') {
+                            return folder.startsWith('MED') || folder.startsWith('SUR') || (!folder.startsWith('ANC') && !folder.startsWith('IMM') && !folder.startsWith('FL'));
                         }
+                        return true;
                     });
                 },
 
                 get folderFilteredPatients() {
-                    if (!this.activeFolder) return [];
                     let list = this.getFolderPatients(this.activeFolder);
+                    
+                    // Filter by A-Z letter (matches either First Name, Last Name, or Full Name)
                     if (this.folderAlpha) {
+                        const char = this.folderAlpha.toUpperCase();
                         list = list.filter(p => {
-                            const name = this.cleanName(p.first, p.last).toUpperCase();
-                            return name.startsWith(this.folderAlpha);
+                            const fullName = this.cleanName(p).toUpperCase();
+                            const first = (p.first || '').toUpperCase().trim();
+                            const last = (p.last || '').toUpperCase().trim();
+                            return fullName.startsWith(char) || first.startsWith(char) || last.startsWith(char);
                         });
                     }
+
+                    // Search Query (matches name, folder number, NIN, or condition)
+                    if (this.searchQuery) {
+                        const q = this.searchQuery.toLowerCase().trim();
+                        list = list.filter(p => {
+                            const fullName = this.cleanName(p).toLowerCase();
+                            const folder = (p.folder_number || p.id || '').toLowerCase();
+                            const nin = (p.nin || '').toLowerCase();
+                            const cond = (p.condition || '').toLowerCase();
+                            return fullName.includes(q) || folder.includes(q) || nin.includes(q) || cond.includes(q);
+                        });
+                    }
+
                     return list;
                 },
 

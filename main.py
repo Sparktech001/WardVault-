@@ -180,27 +180,29 @@ async def get_patients(
                 SELECT id, first, last, name, age, gender, organization, ward_id, condition,
                        blood_group, genotype, phone, nin, bhcpf_id, allergies
                 FROM patients
-                WHERE name LIKE $1 OR ward_id LIKE $2 OR nin LIKE $3 OR bhcpf_id LIKE $4
-                ORDER BY id ASC LIMIT 100
+                WHERE name LIKE $1 OR first LIKE $2 OR last LIKE $3 OR ward_id LIKE $4 OR nin LIKE $5 OR bhcpf_id LIKE $6
+                ORDER BY name ASC LIMIT 300
             """
-            patients = await conn.fetch(query, search_pattern, search_pattern, search_pattern, search_pattern)
+            patients = await conn.fetch(query, search_pattern, search_pattern, search_pattern, search_pattern, search_pattern, search_pattern)
         else:
             query = """
                 SELECT id, first, last, name, age, gender, organization, ward_id, condition,
                        blood_group, genotype, phone, nin, bhcpf_id, allergies
                 FROM patients
-                ORDER BY id ASC LIMIT 100
+                ORDER BY name ASC LIMIT 300
             """
             patients = await conn.fetch(query)
 
         return [
             {
                 "id": str(p["id"]),
-                "name": p["name"] or f"{p['first']} {p['last']}",
-                "folder_number": p["ward_id"],
+                "first": str(p.get("first") or (p["name"].split(" ")[0] if p.get("name") else "")),
+                "last": str(p.get("last") or (" ".join(p["name"].split(" ")[1:]) if p.get("name") and " " in p["name"] else "")),
+                "name": str(p.get("name") or f"{p.get('first', '')} {p.get('last', '')}".strip() or "Patient"),
+                "folder_number": str(p["ward_id"] or p["id"]),
                 "age": p["age"],
                 "gender": p["gender"],
-                "condition": p["condition"],
+                "condition": p["condition"] or "General Outpatient",
                 "blood_group": p.get("blood_group", "O+"),
                 "genotype": p.get("genotype", "AA"),
                 "phone": p.get("phone", ""),
