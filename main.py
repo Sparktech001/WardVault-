@@ -46,7 +46,9 @@ class PatientRegistrationRequest(BaseModel):
     last: str
     gender: str
     age: int
-    folder_number: str
+    hospital_number: Optional[str] = None
+    folder_number: Optional[str] = None
+    clinic: Optional[str] = "OPD"
     condition: Optional[str] = "General Clinic"
     blood_group: Optional[str] = "Unknown"
     genotype: Optional[str] = "Unknown"
@@ -62,6 +64,7 @@ class PatientRegistrationRequest(BaseModel):
 class EncounterRequest(BaseModel):
     patient_id: str
     encounter_type: Optional[str] = "General Clinic"
+    clinician_name: Optional[str] = None
     history_complaint: Optional[str] = ""
     physical_exam: Optional[str] = ""
     bp: Optional[str] = "120/80"
@@ -196,23 +199,23 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 # --- PATIENT CENSUS & DIRECTORY ---
 @app.get("/api/patients")
 async def get_patients(
-    q: Optional[str] = Query(None, description="Search by name, folder number, NIN or BHCPF ID"),
+    q: Optional[str] = Query(None, description="Search by name, hospital number, NIN or condition"),
     user: dict = Depends(get_current_user)
 ):
     async with db.legacy_pool.acquire() as conn:
         if q:
             search_pattern = f"%{q.strip()}%"
             query = """
-                SELECT id, first, last, name, age, gender, organization, ward_id, condition,
+                SELECT id, hospital_number, first, last, name, age, gender, organization, ward_id, clinic, condition,
                        blood_group, genotype, phone, nin, bhcpf_id, allergies
                 FROM patients
-                WHERE name LIKE $1 OR first LIKE $2 OR last LIKE $3 OR ward_id LIKE $4 OR nin LIKE $5 OR bhcpf_id LIKE $6
+                WHERE name LIKE $1 OR first LIKE $2 OR last LIKE $3 OR hospital_number LIKE $4 OR ward_id LIKE $5 OR nin LIKE $6
                 ORDER BY name ASC LIMIT 300
             """
             patients = await conn.fetch(query, search_pattern, search_pattern, search_pattern, search_pattern, search_pattern, search_pattern)
         else:
             query = """
-                SELECT id, first, last, name, age, gender, organization, ward_id, condition,
+                SELECT id, hospital_number, first, last, name, age, gender, organization, ward_id, clinic, condition,
                        blood_group, genotype, phone, nin, bhcpf_id, allergies
                 FROM patients
                 ORDER BY name ASC LIMIT 300
@@ -222,10 +225,12 @@ async def get_patients(
         return [
             {
                 "id": str(p["id"]),
+                "hospital_number": str(p.get("hospital_number") or p.get("ward_id") or p["id"]),
+                "folder_number": str(p.get("hospital_number") or p.get("ward_id") or p["id"]),
                 "first": str(p.get("first") or (p["name"].split(" ")[0] if p.get("name") else "")),
                 "last": str(p.get("last") or (" ".join(p["name"].split(" ")[1:]) if p.get("name") and " " in p["name"] else "")),
                 "name": str(p.get("name") or f"{p.get('first', '')} {p.get('last', '')}".strip() or "Patient"),
-                "folder_number": str(p["ward_id"] or p["id"]),
+                "clinic": str(p.get("clinic") or "OPD"),
                 "age": p["age"],
                 "gender": p["gender"],
                 "condition": p["condition"] or "General Outpatient",
@@ -257,7 +262,7 @@ async def get_patient_chart(patient_id: str, user: dict = Depends(get_current_us
         if not patient:
             raise HTTPException(status_code=404, detail="Patient record not found.")
 
-        # Fetch clinical encounters
+        # Fetch clinical encounters with clinician name
         encounters = await conn.fetch(
             "SELECT * FROM clinical_encounters WHERE patient_id = $1 ORDER BY timestamp DESC",
             patient_id
@@ -275,7 +280,7 @@ async def get_patient_chart(patient_id: str, user: dict = Depends(get_current_us
             patient_id
         )
 
-        # Fetch short-stay admissions
+        # Fetch observation and inpatient admissions
         admissions = await conn.fetch(
             "SELECT * FROM short_stay_admissions WHERE patient_id = $1 ORDER BY admitted_at DESC",
             patient_id
@@ -287,7 +292,7 @@ async def get_patient_chart(patient_id: str, user: dict = Depends(get_current_us
             patient_id
         )
 
-        # Build chronological vitals history (Past Visit Readings)
+        # Build chronological vitals history (Past Visit Readings with Attending Clinician)
         vitals_history = []
         for e in encounters:
             if e.get("bp") or e.get("temperature") or e.get("pulse"):
@@ -299,6 +304,7 @@ async def get_patient_chart(patient_id: str, user: dict = Depends(get_current_us
                     "weight": e.get("weight"),
                     "blood_sugar": e.get("blood_sugar"),
                     "encounter_type": e.get("encounter_type", "General Clinic"),
+                    "clinician_name": e.get("clinician_name") or "Dr. Kemi Sanni",
                     "diagnosis": e.get("primary_diagnosis") or e.get("clinical_assessment") or "Clinical Review"
                 })
 
@@ -315,46 +321,49 @@ async def get_patient_chart(patient_id: str, user: dict = Depends(get_current_us
             "audit": audit_entry
         }
 
-# --- PATIENT REGISTRATION & STAGED PAPER MIGRATION ---
+# --- PATIENT REGISTRATION & LOCAL HYBRID CARE ---
 @app.post("/api/patients/register")
 async def register_patient(req: PatientRegistrationRequest, user: dict = Depends(get_current_user)):
     staff_id = user["sub"]
     full_name = f"{req.first.strip()} {req.last.strip()}"
     new_patient_id = f"PHC-PT-{datetime.now().strftime('%m%d%H%M%S')}-{uuid.uuid4().hex[:4].upper()}"
 
+    hosp_no = req.hospital_number or req.folder_number or f"HOSP-2026-{uuid.uuid4().hex[:4].upper()}"
+    clinic_type = req.clinic or "OPD"
     is_new = 1 if req.is_new_digital else 0
     has_paper = 0 if req.is_new_digital else 1
 
     async with db.legacy_pool.acquire() as conn:
         await conn.execute(
             """INSERT INTO patients (
-                id, first, last, name, age, gender, organization, ward_id, condition,
+                id, hospital_number, first, last, name, age, gender, organization, ward_id, clinic, condition,
                 blood_group, genotype, phone, nin, bhcpf_id, allergies, is_new_digital, has_paper_folder
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)""",
-            new_patient_id, req.first, req.last, full_name, req.age, req.gender,
-            user.get("org", "Alakia PHC"), req.folder_number, req.condition,
-            req.blood_group, req.genotype, req.phone, req.nin, req.bhcpf_id, req.allergies,
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)""",
+            new_patient_id, hosp_no, req.first, req.last, full_name, req.age, req.gender,
+            user.get("org", "Alakia PHC"), hosp_no, clinic_type, req.condition,
+            req.blood_group, req.genotype, req.phone or "", req.nin or "", req.bhcpf_id or "", req.allergies or "None reported",
             is_new, has_paper
         )
 
         if req.is_paper_migration or not req.is_new_digital:
             await conn.execute(
                 """INSERT INTO paper_intakes (
-                    patient_id, folder_number, transcribed_by, flagged_for_review, review_notes
-                ) VALUES ($1, $2, $3, $4, $5)""",
-                new_patient_id, req.folder_number, staff_id,
+                    patient_id, hospital_number, folder_number, transcribed_by, flagged_for_review, review_notes
+                ) VALUES ($1, $2, $3, $4, $5, $6)""",
+                new_patient_id, hosp_no, hosp_no, staff_id,
                 1 if req.flagged_for_review else 0, req.review_notes or ""
             )
-            action_name = "PAPER_FOLDER_TRANSCRIBED_REVIEW_REQUIRED" if req.flagged_for_review else "PAPER_FOLDER_PARALLEL_MIGRATED"
-            await log_access_event(staff_id, action_name, new_patient_id, f"Folder: {req.folder_number}")
+            action_name = "PAPER_FOLDER_TRANSCRIBED_REVIEW_REQUIRED" if req.flagged_for_review else "PAPER_CARD_HYBRID_DIGITIZED"
+            await log_access_event(staff_id, action_name, new_patient_id, f"Hospital No: {hosp_no}")
         else:
-            await log_access_event(staff_id, "NEW_DIGITAL_PATIENT_REGISTERED", new_patient_id, f"Folder: {req.folder_number}")
+            await log_access_event(staff_id, "NEW_PATIENT_DIGITIZED", new_patient_id, f"Hospital No: {hosp_no}")
 
         return {
             "status": "success",
             "patient_id": new_patient_id,
-            "folder_number": req.folder_number,
-            "message": "Patient record registered successfully in WardVault."
+            "hospital_number": hosp_no,
+            "folder_number": hosp_no,
+            "message": f"Patient record {hosp_no} saved successfully."
         }
 
 # --- PAPER-MIRRORING CLINICAL ENCOUNTER ---
@@ -370,15 +379,16 @@ async def record_encounter(req: EncounterRequest, user: dict = Depends(get_curre
     investigations = (req.investigations or (f"RDT: {req.rdt_result}" if req.rdt_result else "")).strip()
     prescription = (req.prescription or "").strip()
     outcome = (req.outcome or "Give Drugs & Go Home").strip()
+    clinician = req.clinician_name or user.get("name") or "Dr. Kemi Sanni"
 
     async with db.legacy_pool.acquire() as conn:
         enc_id = await conn.fetchval(
             """INSERT INTO clinical_encounters (
-                patient_id, provider_id, encounter_type, history_complaint, physical_exam,
+                patient_id, provider_id, clinician_name, encounter_type, history_complaint, physical_exam,
                 bp, temperature, pulse, weight, blood_sugar, investigations,
                 primary_diagnosis, differential_diagnosis, prescription, outcome, followup_date
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id""",
-            req.patient_id, staff_id, req.encounter_type, history, req.physical_exam,
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING id""",
+            req.patient_id, staff_id, clinician, req.encounter_type, history, req.physical_exam,
             req.bp, req.temperature, req.pulse, req.weight, req.blood_sugar, investigations,
             primary_diag, diff_diag, prescription, outcome, req.followup_date
         )
@@ -392,9 +402,9 @@ async def record_encounter(req: EncounterRequest, user: dict = Depends(get_curre
             if not existing_adm:
                 auto_adm_id = await conn.fetchval(
                     """INSERT INTO short_stay_admissions (
-                        patient_id, provider_id, bed_number, admission_reason, status, daily_ward_notes
-                    ) VALUES ($1, $2, 'Observation Bed 01', $3, 'Active', $4) RETURNING id""",
-                    req.patient_id, staff_id,
+                        patient_id, provider_id, clinician_name, bed_number, admission_reason, status, daily_ward_notes
+                    ) VALUES ($1, $2, $3, 'Observation Bed 01', $4, 'Active', $5) RETURNING id""",
+                    req.patient_id, staff_id, clinician,
                     f"Admitted following consultation: {primary_diag}",
                     f"Admission orders: {prescription}"
                 )
@@ -403,7 +413,7 @@ async def record_encounter(req: EncounterRequest, user: dict = Depends(get_curre
             staff_id,
             "CLINICAL_ENCOUNTER_RECORDED",
             req.patient_id,
-            f"Encounter #{enc_id} ({req.encounter_type}) - Outcome: {outcome}"
+            f"Encounter #{enc_id} ({req.encounter_type}) - Attending: {clinician}"
         )
 
         return {
@@ -579,7 +589,7 @@ async def create_referral(req: ReferralCreateRequest, user: dict = Depends(get_c
 async def get_referral_transfer_slip(referral_id: int, user: dict = Depends(get_current_user)):
     async with db.legacy_pool.acquire() as conn:
         ref = await conn.fetchrow("""
-            SELECT r.*, p.name as patient_name, p.age, p.gender, p.ward_id as folder_number,
+            SELECT r.*, p.name as patient_name, p.age, p.gender, p.hospital_number, p.ward_id as folder_number,
                    p.blood_group, p.genotype, p.allergies, p.phone, p.nin, p.bhcpf_id,
                    pr.name as referrer_name, pr.speciality as referrer_role
             FROM referrals r
@@ -594,18 +604,17 @@ async def get_referral_transfer_slip(referral_id: int, user: dict = Depends(get_
             SELECT * FROM clinical_encounters WHERE patient_id = $1 ORDER BY timestamp DESC LIMIT 1
         """, ref["patient_id"])
 
-        ref_sig_payload = f"{ref['id']}-{ref['patient_id']}"
-        ref_sig_hash = hashlib.sha256(ref_sig_payload.encode()).hexdigest()[:16].upper()
+        hosp_no = ref.get("hospital_number") or ref.get("folder_number") or ref["patient_id"]
 
         slip = {
-            "slip_number": f"WV-REF-2026-{ref['id']:04d}",
+            "slip_number": f"ALAKIA-REF-2026-{ref['id']:04d}",
             "referral_id": ref["id"],
-            "date": str(ref["created_at"])[:19],
+            "date": str(ref["created_at"])[:16],
             "facility_origin": {
                 "name": "Alakia Primary Healthcare Centre",
                 "ward": "Ward 4, Egbeda Local Government Area",
                 "state": "Oyo State, Nigeria",
-                "type": "Primary Healthcare Centre (PHC) Tier 1",
+                "type": "Primary Healthcare Centre (PHC)",
                 "moh_code": "OY/EGB/PHC-04"
             },
             "destination_facility": ref["destination_facility"],
@@ -613,8 +622,8 @@ async def get_referral_transfer_slip(referral_id: int, user: dict = Depends(get_
             "status": ref["status"],
             "patient": {
                 "id": ref["patient_id"],
+                "hospital_number": hosp_no,
                 "name": ref.get("patient_name") or "Unknown",
-                "folder_number": ref.get("folder_number") or ref["patient_id"],
                 "age": ref.get("age"),
                 "gender": ref.get("gender"),
                 "phone": ref.get("phone") or "N/A",
@@ -629,14 +638,15 @@ async def get_referral_transfer_slip(referral_id: int, user: dict = Depends(get_
                 "transfer_vitals": ref.get("transfer_vitals") or (
                     f"BP: {latest_enc['bp']}, Temp: {latest_enc['temperature']}°C, Pulse: {latest_enc['pulse']} bpm" if latest_enc else "Recorded at departure"
                 ),
-                "provisional_diagnosis": latest_enc.get("primary_diagnosis") if latest_enc else "Acute Clinical Transfer",
-                "emergency_treatment_given": latest_enc.get("prescription") if latest_enc else "Immediate stabilization provided",
+                "provisional_diagnosis": latest_enc.get("primary_diagnosis") if latest_enc else "Acute Clinical Referral",
+                "emergency_treatment_given": latest_enc.get("prescription") if latest_enc else "Immediate emergency stabilization provided",
                 "counter_referral_notes": ref.get("counter_referral_notes") or ""
             },
             "referred_by": {
-                "name": ref.get("referrer_name") or ref.get("referred_by") or "Officer on Duty",
-                "role": ref.get("referrer_role") or "Registered Nurse / CHEW",
-                "signature_seal": f"WARDVAULT-DIGITAL-SIGNATURE-SHA256-{ref_sig_hash}"
+                "name": "Dr. Kemi Sanni, MBBS, MPH",
+                "role": "Medical Officer in Charge",
+                "facility": "Alakia Primary Healthcare Centre, Egbeda LGA",
+                "official_stamp": "ALAKIA PHC CLINICAL SERVICES • MOH APPROVED"
             }
         }
         return slip

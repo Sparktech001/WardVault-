@@ -1,181 +1,131 @@
-# WardVault: 12-Hour PHC Implementation MVP Plan
-## Implementation-Ready Patient Records & Care-Coordination Platform for Underserved Nigerian PHCs
+# WardVault PHC: Implementation Plan
+## Clinical MVP Realignment: OpenMRS-Benchmark, 3-Color Clean UI, Hybrid Local Records & De-Noised Workstation
 
-**Target Track:** USPF Changemaker Challenge 2026 (Track C: Healthcare Innovation)  
-**Target Setting:** Underserved Primary Healthcare Centres (PHCs) across Nigeria  
-**Product Framing:** Implementation-Ready MVP (Designed for real clinical adoption, not an abstract prototype)  
-**Status:** **AWAITING USER CONFIRMATION & APPROVAL (No code changes applied yet)**  
-
----
-
-## 1. Executive Summary & Synthesis of Team Review
-
-Following the team lead, panel, and speaker review, WardVault is being tailored specifically for **Nigerian Primary Healthcare Centre reality**. 
-
-PHC nurses and Community Health Extension Workers (CHEWs) do not use tertiary hospital electronic systems; they work with **standard paper folders**, face frequent power outages, handle **short-stay admissions (1–3 days)** for acute illnesses like severe malaria, and require **plain, intuitive everyday language** rather than developer jargon or AI-sounding buzzwords.
+**Target:** Primary Healthcare Centres (PHCs) / Family Health Centres  
+**Benchmark:** OpenMRS (NigeriaMRS) Comparison & Differentiators  
+**Current Milestone:** Final 12-Hour Implementation-Ready MVP  
+**Status:** **READY FOR REVIEW**
 
 ---
 
-## 2. Plain Language UI Dictionary (Removing Technical Jargon)
+## 1. OpenMRS Research & Competitive Edge
 
-To ensure nurses, CHEWs, and records officers feel immediately at home, all academic and tertiary hospital jargon will be replaced with plain, practical clinic words:
+### A. How OpenMRS Operates in Nigeria (NigeriaMRS / Festac)
+- **Deployment Context:** In Nigeria, OpenMRS (customized as NigeriaMRS) is predominantly deployed in secondary and tertiary facilities (such as Festac / Amuwo Odofin) heavily funded by PEPFAR, CDC, and USAID specifically for **HIV/AIDS reporting** (NDR / National Data Repository, viral load tracking, and ART registries).
+- **The OpenMRS Gap in Nigerian PHCs:**
+  1. **Heavy Architecture:** OpenMRS runs on a heavy Java/Spring/Tomcat/MySQL stack requiring high-spec servers and constant technical maintenance. Underserved PHCs lack dedicated IT staff and server rooms.
+  2. **Not Truly Offline-First:** OpenMRS was architected for connected client-server LANs. In rural and peri-urban PHCs with zero internet and frequent blackouts, OpenMRS instances fail or cannot sync reliably.
+  3. **Complex EAV Schema:** The Entity-Attribute-Value database model with thousands of concept tables makes simple primary care reporting slow and over-engineered for community health extension workers (CHEWs).
+  4. **Neglect of Routine Primary Care:** OpenMRS in Nigeria is rarely used for routine walk-in primary care (malaria, antenatal checkups, child immunization, hypertension refills). It is treated as a donor-compliance HIV tool.
 
-| Jargon to REMOVE | Plain Language Replacement | Why the Change Matters |
-| :--- | :--- | :--- |
-| **OPD / Outpatient** | **General Clinic** or **Daily Patients** | PHC staff and patients call general consultations the "General Clinic". |
-| **Longitudinal Vitals** | **Past Visit Readings** | Plain description of previous blood pressure and temperature checks. |
-| **Paper Migration Review Queue** | **Register Existing Paper Folder** | Clear action for entering an old physical folder into the system. |
-| **ABAC Policy Restriction** | **Staff Member Off-Duty** | Clean notice explaining that staff must be on shift to access records. |
-| **Triage Encounter** | **Patient Consultation** | Mirrors the physical consultation room. |
-| **Chief Complaint** | **What brought the patient today?** | Natural medical interview question used in primary care clerkship. |
-| **Cryptographic Hash Proof** | **Verified Clinic Record ✓** | Assures staff the record is locked and tamper-evident without confusing math terms. |
-
----
-
-## 3. The 10 Real-World Sample Patients (Curated MVP Cohort)
-
-The 100+ generic synthetic entries (`FL-1000` series) will be completely replaced with **10 realistic, diverse clinical cases** based on daily Nigerian PHC practice:
-
-| # | Patient Name | Age / Sex | Clinic Folder # | Clinical Story & Management |
-| :- | :--- | :--- | :--- | :--- |
-| **1** | **Amina Garba** | 26 / F | **ANC-2026-01** | **Pregnancy & Delivery (ANC):** 32 weeks pregnant. Normal blood pressure (115/75), fundal height matches dates. Given Iron/Folic acid and second dose of Fansidar (IPTp) to prevent malaria. Booked for next check in 2 weeks. |
-| **2** | **Baby Kazeem Adeleke** | 6 wks / M | **EPI-2026-02** | **Newborn Immunization:** 6-week routine immunization visit. Received Pentavalent 1, Oral Polio 1, PCV 1, and Rotavirus 1. Weight: 4.3kg. Mother counseled on exclusive breastfeeding. |
-| **3** | **Joy Okafor** | 34 / F | **GEN-2026-03** | **HIV Regular Drug Pickup:** Known HIV patient doing well on TLD daily tablets. Undetectable viral load. Given 3-month drug refill, checked for side effects, adherence confirmed. |
-| **4** | **Usman Danladi** | 42 / M | **GEN-2026-04** | **Tuberculosis (TB) Care:** Coughing for over 3 weeks with night sweats and weight loss. Sputum test ordered; started on standard 4-drug Anti-TB fixed-dose combination (RHZE). Contact tracing initiated. |
-| **5** | **Tunde Balogun** | 19 / M | **GEN-2026-05** | **Severe Malaria (Admitted for 2 Days):** Arrived with high fever (39.5°C), vomiting, and extreme weakness. Rapid malaria test positive. **Admitted to Observation Ward** for IV Artesunate and IV fluids for 36 hours. Recovered, completed oral ACT, and discharged home. |
-| **6** | **Blessing Adeleke** | 29 / F | **GEN-2026-06** | **Depression / Mental Health:** Mother of young child presenting with 2 months of constant crying, exhaustion, lack of sleep, and feelings of hopelessness. Screened with PHQ-9 (moderate depression). Given supportive counseling and scheduled for weekly support. |
-| **7** | **Musa Ibrahim** | 35 / M | **ORTHO-2026-07** | **Orthopedic / Bone Injury (Referral):** Okada motorcycle rider involved in a crash. Broken right lower leg bone (closed tibia fracture). Leg splinted, given pain relief, and given an **Emergency Secondary Transfer Slip to UCH Ibadan**. |
-| **8** | **Chief Samuel Adele** | 58 / M | **CHRONIC-2026-08** | **High Blood Pressure & Diabetes:** Long-standing hypertension. Today's BP: 155/95 mmHg. Fasting blood sugar: 180 mg/dL. Past visit readings show gradual improvement. Refilled Amlodipine 10mg and Metformin 500mg. Counseled on salt reduction. |
-| **9** | **Baby Aisha Bello** | 14 mos / F | **EPI-2026-09** | **Child Malnutrition & Diarrhea:** Weak toddler with watery stool. Arm tape check (MUAC) shows 11.2 cm (Red - Severe Wasting). Started immediately on ORS, Zinc, and Plumpy'Nut (RUTF paste). |
-| **10** | **Emmanuel Chukwu** | 7 yrs / M | **GEN-2026-10** | **Routine Child Health & Deworming:** Healthy primary school boy. Given Albendazole 400mg tablet to clear stomach worms and Vitamin A capsule for healthy eyes. |
+### B. How WardVault Differentiates & Wins
+- **Visual Simplicity:** Adopts the clean, un-crowded, non-noisy design philosophy of OpenMRS 3 (O3) without any flashy "AI-vibe" gradients or neon badges.
+- **True Offline-First Local Node:** Runs natively on local low-power hardware (laptops, mini-PCs, tablets) using SQLite and browser IndexedDB. Operates 100% offline with zero latency.
+- **Routine PHC Focus:** Built specifically for routine Nigerian Family Health Centre care: OPD (General Clinic), Antenatal Care (ANC), Child Immunization (EPI), Short-Stay Admissions, and Emergency Referrals.
+- **Hybrid Paper/Digital:** Allows clinical staff to work with physical paper cards while data clerks digitize records seamlessly in the local environment.
 
 ---
 
-## 4. Consultation Flow: Following the Physical Paper Folder
+## 2. UI De-Noising & 3-Color Palette
 
-The consultation screen will be structured in the exact step-by-step order of the standard physical paper clerkship:
+All "AI-ish" neon badges, pulsing telemetry widgets, theoretical explanation blocks, and multi-colored tabs are removed. The UI is restricted strictly to **three primary colors**:
 
-```
-[ Step 1: PATIENT HISTORY ]
-  - What brought the patient today? (Main complaint & duration, e.g. "3 days of hot body and shivering")
-  - Details of illness (History of Presenting Complaint)
-  - Past medical history, current drugs, and allergies
-
-[ Step 2: PHYSICAL EXAMINATION ]
-  - Today's Vital Signs (Blood pressure, Temperature, Pulse, Weight)
-  - Physical Observations (Pallor/pale eyes, dehydration, swollen feet, chest sounds, abdomen)
-
-[ Step 3: TESTS & INVESTIGATIONS ]
-  - Point-of-care clinic tests:
-    * Malaria Rapid Test (mRDT): Negative / Positive
-    * Sputum Test for TB
-    * HIV Rapid Screening
-    * Urinalysis & Blood Sugar test
-
-[ Step 4: DIAGNOSIS ]
-  - Main Diagnosis (e.g., Severe Malaria, Gestational Anemia, Bone Fracture)
-  - Other possible conditions (Differential diagnoses)
-
-[ Step 5: TREATMENT & PRESCRIPTION (Rx) ]
-  - Prescribe medicines (Drug name, dose, times per day, how many days)
-  - Pharmacy dispensing notes
-
-[ Step 6: CONSULTATION OUTCOME ]
-  1. Give Drugs & Go Home (Outpatient discharge)
-  2. Order Tests & Return (Wait for clinic lab results today)
-  3. Book Next Visit (e.g., return in 2 weeks for BP check or 3 months for HIV drugs)
-  4. ADMIT TO OBSERVATION WARD (1 to 3 Days short-stay admission)
-  5. TRANSFER PATIENT (Secondary Referral to General Hospital / Teaching Hospital)
-```
+1. **Deep Slate / Medical Navy (`#0f172a` / `#1e293b`):** For typography, structural sidebars, and clean headers.
+2. **Clinical Blue / Teal (`#0284c7` / `#005b5b`):** For primary actions, active navigation items, and positive confirmations.
+3. **Clean Neutral Gray / White (`#f8fafc` / `#ffffff`):** For high-contrast surfaces, clean tables, and subtle borders (`#e2e8f0`).
+*(Subtle red `#dc2626` is reserved solely for medical safety alerts, such as drug allergies).*
 
 ---
 
-## 5. Short-Stay Admission Flow (1 to 3 Days)
+## 3. Scope of Work (Exact Implementation Changes)
 
-Primary healthcare centres do not have large surgical wards, but they **routinely admit patients for 1 to 3 days** (Observation Beds) for:
-- Severe malaria on IV Artesunate / drips
-- Dehydrated children receiving IV/oral rehydration
-- Women in early labor / post-delivery observation (24 hours)
+### 1. Patient Navigation & Registration Overhaul
+- **Header Patient Action:** Remove the large bulky "+ Register New Patient" banner button. Replace it with a clean patient icon `👤+` in the header bar with a dropdown menu option: **"Add Patient"**.
+- **New Patient Form Fields:**
+  - Replace the `phone` field with **Hospital Number** (`hospital_number`, e.g., `HOSP-2026-0412`).
+  - Keep clean essential demographics: First Name, Last Name, Age, Gender, Hospital Number, Clinic Classification (OPD General Clinic, ANC Maternity, Child Health / EPI).
+- **Remove Orthopedic Cabinet:** Family health centres do not have orthopedic departments. The clinic cabinets are simplified to:
+  1. `All Records`
+  2. `OPD (General Clinic)`
+  3. `ANC & Maternity`
+  4. `Child Health & Immunization (EPI)`
+  *(Orthopedic trauma cases like Musa Ibrahim present to OPD and are immediately stabilized and referred to secondary hospitals).*
 
-### How the Admission Flow Works:
-1. **Admit Action:** Clinician selects **"Admit to Observation Ward (1–3 Days)"**, chooses an observation bed (e.g. Bed 02), and notes admission reason.
-2. **Observation Ward List:** A dedicated tab shows currently admitted patients in the facility with their length of stay (e.g. *Tunde Balogun • Admitted 24 hrs ago • Bed 02*).
-3. **Daily Ward Notes:** Nurses log daily progress notes and morning/evening vitals without having to register a whole new patient.
-4. **Resolution:** Clinician selects either:
-   - **Discharge Home** (condition resolved, switch to oral tablets)
-   - **Transfer to General Hospital** (patient not improving, escalate referral).
+### 2. Multi-Test Laboratory Investigation Dropdown
+- Replace the previous freeform text and malaria-only radio buttons with a **multi-test selector dropdown** containing standard Nigerian PHC laboratory and diagnostic investigations:
+  - Malaria Rapid Diagnostic Test (mRDT)
+  - Genotype (Hb Electrophoresis: AA, AS, SS, AC)
+  - Fasting / Random Blood Sugar
+  - H. pylori Rapid Antigen Test
+  - Packed Cell Volume (PCV / Hemoglobin)
+  - Urinalysis (10-Parameter Dipstick)
+  - Obstetric / Abdominal Ultrasound Scan
+  - Chest / Extremity X-Ray
+  - Sputum AFB / GeneXpert (Tuberculosis)
+  - HIV 1/2 Rapid Screening
+- Clinicians can select any test, record findings or mark as ordered, and attach multiple investigations to the consultation cleanly.
 
----
+### 3. Consultation Flow & Single-Line Visit History (OpenMRS Style)
+- **Consultation Order Maintained:** History (Reason for visit) $\rightarrow$ Examination & Entry Vitals $\rightarrow$ Investigations (Test dropdown) $\rightarrow$ Diagnosis $\rightarrow$ Prescription (Rx) $\rightarrow$ Clinical Outcome.
+- **De-Noised Single-Line Visit History:**
+  - Replace multi-layered noisy cards with clean single-line table rows dated and showing the attending clinician's name:
+    | Date & Time | Visit Type | Attending Clinician / Doctor | Diagnosis / Findings | Outcome | Action |
+  - Clean modal / expand drawer to view consultation details without clutter.
+- **Past Visit Readings Table:** Retain the stacked chronological blood pressure comparison table for returning chronic patients (Chief Samuel Adele: `160/98` $\rightarrow$ `142/90` $\rightarrow$ `126/82`) formatted in clean, uncrowded monochrome.
 
-## 6. Past Visit Readings (Blood Pressure & Vitals History)
+### 4. Observation & Admission Ward (Short Stays to 30–40 Days)
+- Support both:
+  - **Short-Stay Admissions (1–3 Days):** Severe malaria on IV Artesunate, acute dehydration rehydration, labor observation.
+  - **Extended PHC Admissions (up to 30–40 Days):** Nutritional rehabilitation for severe acute malnutrition (e.g. Baby Aisha Bello on therapeutic feeding), chronic wound management, and prolonged primary recovery.
+- Ward Bed management with Bed Number, Admission Date, Attending Doctor, Daily Progress Notes, and Discharge Summary.
 
-When a returning patient is opened in the consultation room, the clinician sees all previous visit readings arranged together chronologically:
+### 5. Official Letter Transfer Slip with Back Button
+- **Clear Navigation:** Add a prominent **"← Back to Referrals"** button and close button so staff can close the slip immediately without refreshing the page.
+- **Official Letter Format:** Format the slip as a formal medical referral letter from Alakia Primary Healthcare Centre addressed to the receiving secondary hospital (e.g. University College Hospital UCH Ibadan).
+- **Remove Digital Hash Clutter:** Strip raw cryptographic hash text strings (`WARDVAULT-DIGITAL-SIGNATURE-...`) from the printable document. Replace with a formal medical sign-off:
+  ```
+  Dr. Kemi Sanni, MBBS, MPH
+  Medical Officer in Charge, Alakia Primary Healthcare Centre
+  Egbeda Local Government Area, Oyo State
+  [Official Stamp & Signature]
+  ```
 
-| Visit Date | Blood Pressure | Temp | Pulse | Weight | Clinical Note |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Today** | **126 / 82 mmHg** (Controlled) | 36.8°C | 74 bpm | 75.5 kg | Responding well to Amlodipine |
-| **1 Month Ago** | **142 / 90 mmHg** (High Stage 1) | 36.7°C | 78 bpm | 76.0 kg | Dose adjusted to 10mg |
-| **3 Months Ago** | **160 / 98 mmHg** (High Stage 2) | 37.0°C | 84 bpm | 78.2 kg | Initial presentation with headaches |
-
-Staff can immediately tell if blood pressure is improving without digging through stacks of archived papers.
-
----
-
-## 7. Staged Paper-to-Digital Migration (Three Layers)
-
-Instead of an arbitrary review flag, migration is designed around real facility operations to prevent lines and duplicate records:
-
-*   **Layer 1: Digital-First for New Patients**  
-    Any patient arriving at the PHC for the first time is entered directly into WardVault. No paper chart is created.
-*   **Layer 2: Dual-Track for Existing Paper Folders**  
-    When a returning patient arrives with an old paper card, the Records Officer enters their existing folder number (e.g. `ANC-042`) and basic demographics. The paper folder continues to serve as the physical legal record while current consultations run digitally in parallel.
-*   **Layer 3: Archival Catch-Up (Off-Peak Hours)**  
-    Records staff transcribe older paper chart histories during quiet afternoon hours so morning clinic queues are never kept waiting.
-
----
-
-## 8. Fully Functional Closed-Loop Referral System
-
-To turn the current frontend mockup into a working clinical referral tool:
-1. **Real Database Backend:** A dedicated `referrals` table records patient ID, referring officer, destination hospital (e.g., *University College Hospital UCH Ibadan*, *Adeoyo Maternity*, *General Hospital Oyo*), clinical reason, urgency, and transfer notes.
-2. **Official Transfer Slip (Printable/Saveable):** One-click button generates a standard Nigerian PHC Referral Transfer Slip formatted cleanly with clinical summary, transfer vitals, and provisional diagnosis.
-3. **Care Loop Stepper:** Tracks the referral from **Initiated at PHC → In Transit → Received at Hospital → Feedback Received & Closed**.
-
----
-
-## 9. Login Roles & Facility Access
-
-Clean, realistic staff roles for the demo:
-1. **Staff Midwife / Nurse** (`PHC/26/NUR/103` • Nurse Folake) — Consultations, ANC, deliveries, admissions.
-2. **Community Health Extension Worker (CHEW)** (`PHC/26/CHEW/102` • Amina Bello) — Triage, malaria, vaccinations, general clinic.
-3. **Records Officer** (`PHC/26/REC/101` • Ibrahim Musa) — Folder registration, paper-to-digital indexing.
-4. **Facility In-Charge (Chief)** (`PHC/26/MED/001` • Dr. Kemi Sanni) — Oversight, approvals, referral escalation, facility reports.
-
----
-
-## 10. Execution Plan (What We Will Build)
-
-- [ ] **Step 1: Database Seed Overhaul (`database.py`, `restore_dataset.py`)**
-  - Clear out the generic 100+ Synthea rows and seed the exact 10 realistic PHC patients.
-  - Create the `short_stay_admissions` table for 1–3 day observation beds.
-  - Seed historical visit vitals (past BP readings) for returning patients.
-- [ ] **Step 2: Backend API Routes (`main.py`)**
-  - Add routes for Short-Stay Admissions: `POST /api/admissions`, `GET /api/admissions/active`, `PATCH /api/admissions/{id}/discharge`.
-  - Update `POST /api/encounters` to save structured paper clerkship fields (History, Exam, Tests, Diagnosis, Rx, Outcome).
-  - Connect full referral management with transfer slip data endpoint.
-- [ ] **Step 3: Frontend UI Redesign (`index.html`)**
-  - Simplify all labels into plain language (General Clinic, Past Visit Readings, etc.).
-  - Build the paper-style consultation room (History → Exam → Tests → Diagnosis → Rx → Outcome).
-  - Add the **Short-Stay Observation Ward** tab (1–3 days admissions).
-  - Add the **Past Visit Readings** historical vitals table for returning patients.
-  - Make referral status updates and printable transfer slips fully functional.
-- [ ] **Step 4: Verification & Git Deployment**
-  - Run automated API tests on all 10 clinical scenarios and admissions.
-  - Push to GitHub `main` for instant Render cloud deployment.
+### 6. Hybrid Paper-to-Digital Care (Local Storage)
+- Drop theoretical 3-layer architecture diagrams and lengthy explanatory paragraphs.
+- Keep the system purely functional:
+  - Records staff digitize physical paper cards directly into local storage.
+  - Data is saved directly in the local environment (`wardvault_clinical.db` via SQLite and browser IndexedDB).
+  - Works with or without network access (hybrid fallback).
 
 ---
 
-## 11. Approval & Confirmation Gate
+## 4. Work Breakdown & Execution Steps
 
-> **No code has been altered yet.**  
-> Please review this updated implementation plan. Once you give your confirmation, we will begin implementation and deliver the completed, plain-language MVP.
+1. **Step 1: Database & Seed Realignment (`seed_phc_mvp.py` & `main.py`)**
+   - Update `patients` table to ensure `hospital_number` is first-class.
+   - Remove orthopedic clinic tag; map trauma patient Musa Ibrahim to OPD with emergency secondary referral to UCH.
+   - Support extended admissions up to 30–40 days in `short_stay_admissions`.
+   - Update `clinical_encounters` investigations to store structured test lists from dropdown.
+
+2. **Step 2: Backend API Routes (`main.py`)**
+   - Update patient registration model to accept `hospital_number`.
+   - Update referral slip payload to produce the clean, formal medical letter format without raw hash strings.
+   - Ensure all endpoints return clean, concise responses.
+
+3. **Step 3: Frontend Interface Redesign (`index.html`)**
+   - Apply 3-color palette (Deep Slate, Clinical Blue/Teal, Neutral White/Gray).
+   - Implement header `👤+` icon with "Add Patient" dropdown.
+   - Replace phone field with Hospital Number in patient registration.
+   - Implement multi-test investigation dropdown (mRDT, Genotype, Blood Sugar, H. pylori, PCV, Urinalysis, Ultrasound, X-Ray, TB, HIV).
+   - Convert past visit history into OpenMRS-style single-line dated rows with attending doctor's name.
+   - Refactor Transfer Slip into an official letter with a functional **"← Back to Referrals"** button and clean close actions.
+   - Simplify Paper/Digital tab into a clean, practical local digitizer without theoretical essays.
+
+4. **Step 4: Verification & Deployment**
+   - Run `test_api.py` and verify all endpoints pass.
+   - Test UI in browser at `http://127.0.0.1:8000/`.
+   - Commit and push to `origin main` for automated Render deployment.
+
+---
+
+> **Ready for User Review:** This implementation plan focuses strictly on the current active scope. Once reviewed, implementation will proceed immediately.
