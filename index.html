@@ -186,6 +186,15 @@
                         <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-300" x-text="referrals.length"></span>
                     </button>
 
+                    <button @click="currentTab = 'followup'; fetchFollowups()" class="w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg transition"
+                        :class="currentTab === 'followup' ? 'sidebar-active' : 'hover:bg-slate-800 text-slate-300'">
+                        <span>📞</span>
+                        <span class="flex-1 text-left">Follow-Up & Calls</span>
+                        <template x-if="followupStats && followupStats.due_today > 0">
+                            <span class="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-rose-500 text-white" x-text="followupStats.due_today"></span>
+                        </template>
+                    </button>
+
                     <button @click="currentTab = 'paper'" class="w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg transition"
                         :class="currentTab === 'paper' ? 'sidebar-active' : 'hover:bg-slate-800 text-slate-300'">
                         <span>📋</span>
@@ -776,6 +785,253 @@
                     </div>
                 </div>
 
+                <!-- TAB 6: CLINICAL FOLLOW-UP, APPOINTMENT REMINDERS & DOCTOR AVAILABILITY COORDINATION -->
+                <div x-show="currentTab === 'followup'" x-cloak class="space-y-4">
+                    
+                    <!-- 1. DOCTOR AVAILABILITY STATUS & CLINICAL CONTINGENCY COORDINATION HEADER -->
+                    <div class="bg-white border rounded-xl p-4 shadow-xs"
+                         :class="doctorDutyInfo.is_on_duty ? 'border-slate-200' : 'border-amber-300 bg-amber-50/40'">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                            <div class="flex items-start gap-3">
+                                <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                                     :class="doctorDutyInfo.is_on_duty ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'">
+                                    <span class="text-xl" x-text="doctorDutyInfo.is_on_duty ? '🩺' : '⚠️'"></span>
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <h3 class="font-bold text-slate-900 text-sm" x-text="doctorDutyInfo.name || 'Dr. Kemi Sanni, MBBS, MPH'"></h3>
+                                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                                              :class="doctorDutyInfo.is_on_duty ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-200 text-amber-900 border border-amber-400 animate-pulse'">
+                                            <span x-text="doctorDutyInfo.is_on_duty ? '🟢 In Clinic / On Duty' : '🟡 Away / Not on Seat (Outreach / Off-Duty)'"></span>
+                                        </span>
+                                    </div>
+                                    <p class="text-xs text-slate-600 mt-0.5" x-text="doctorDutyInfo.speciality || 'Facility In-Charge & Chief Medical Officer'"></p>
+                                    <p class="text-[11px] text-slate-500 mt-1">
+                                        <span x-show="doctorDutyInfo.is_on_duty">Medical Officer is on seat. Routine consultations and specialized follow-ups proceeding as scheduled.</span>
+                                        <span x-show="!doctorDutyInfo.is_on_duty" class="text-amber-800 font-medium">
+                                            Medical Officer is currently off-site. Active care coordination protocol: Nurse/CHEW provides triage vitals, routine drug refills, appointment rescheduling, or urgent transfers.
+                                        </span>
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-2 shrink-0">
+                                <button type="button" @click="openDoctorAwayModal()" 
+                                        class="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1.5">
+                                    <span>📞</span>
+                                    <span>Doctor Not on Seat Call</span>
+                                </button>
+                                <button type="button" @click="toggleDoctorDuty()" 
+                                        class="px-3 py-2 border rounded-xl font-semibold text-xs transition"
+                                        :class="doctorDutyInfo.is_on_duty ? 'border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100' : 'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700'">
+                                    <span x-text="doctorDutyInfo.is_on_duty ? 'Mark Doctor Away' : 'Mark Doctor On Duty'"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. CLINICAL OUTREACH METRICS CARDS -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs">
+                            <p class="text-[10px] uppercase font-bold text-slate-400">Total Tracked Appointments</p>
+                            <p class="text-2xl font-bold text-slate-900 mt-1" x-text="followupStats.total || 0"></p>
+                            <p class="text-[11px] text-slate-500 mt-0.5">Antenatal, Chronic & Follow-up</p>
+                        </div>
+                        <div class="bg-white p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/30 shadow-xs">
+                            <p class="text-[10px] uppercase font-bold text-emerald-700">Due Today / Immediate Recall</p>
+                            <p class="text-2xl font-bold text-emerald-800 mt-1" x-text="followupStats.due_today || 0"></p>
+                            <p class="text-[11px] text-emerald-600 mt-0.5">High priority phone outreach</p>
+                        </div>
+                        <div class="bg-white p-3.5 rounded-xl border border-rose-200 bg-rose-50/30 shadow-xs">
+                            <p class="text-[10px] uppercase font-bold text-rose-700">Overdue / Defaulters</p>
+                            <p class="text-2xl font-bold text-rose-800 mt-1" x-text="followupStats.defaulters || 0"></p>
+                            <p class="text-[11px] text-rose-600 mt-0.5">Missed clinic return date</p>
+                        </div>
+                        <div class="bg-white p-3.5 rounded-xl border border-blue-200 bg-blue-50/30 shadow-xs">
+                            <p class="text-[10px] uppercase font-bold text-blue-700">Phone Outreach Completed</p>
+                            <p class="text-2xl font-bold text-blue-800 mt-1" x-text="followupStats.calls_completed || 0"></p>
+                            <p class="text-[11px] text-blue-600 mt-0.5">Verified reminder & contingency calls</p>
+                        </div>
+                    </div>
+
+                    <!-- 3. FOLLOW-UP REGISTRY & OUTREACH QUEUE -->
+                    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                        <div class="p-3.5 border-b border-slate-200 flex flex-wrap justify-between items-center gap-2 bg-slate-50">
+                            <div>
+                                <h3 class="font-bold text-sm text-slate-900">Patient Appointment & Outreach Registry</h3>
+                                <p class="text-[11px] text-slate-500">Reach out to patients to remind them of upcoming appointments or coordinate next steps when doctor is away.</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" @click="openNewFollowupModal()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs transition shadow-xs flex items-center space-x-1">
+                                    <span>➕</span>
+                                    <span>Schedule New Follow-Up / Recall</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Filter & Search Toolbar -->
+                        <div class="p-3 border-b border-slate-100 bg-white flex flex-wrap justify-between items-center gap-2">
+                            <div class="flex items-center space-x-1 text-xs">
+                                <button type="button" @click="followupFilter = 'ALL'" 
+                                        class="px-2.5 py-1 rounded-lg font-medium transition"
+                                        :class="followupFilter === 'ALL' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'">
+                                    All (<span x-text="followupAppointments.length"></span>)
+                                </button>
+                                <button type="button" @click="followupFilter = 'TODAY'" 
+                                        class="px-2.5 py-1 rounded-lg font-medium transition"
+                                        :class="followupFilter === 'TODAY' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100'">
+                                    Due Today (<span x-text="followupStats.due_today"></span>)
+                                </button>
+                                <button type="button" @click="followupFilter = 'WEEK'" 
+                                        class="px-2.5 py-1 rounded-lg font-medium transition"
+                                        :class="followupFilter === 'WEEK' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'">
+                                    This Week
+                                </button>
+                                <button type="button" @click="followupFilter = 'DEFAULTERS'" 
+                                        class="px-2.5 py-1 rounded-lg font-medium transition"
+                                        :class="followupFilter === 'DEFAULTERS' ? 'bg-rose-600 text-white' : 'text-slate-600 hover:bg-slate-100'">
+                                    Overdue (<span x-text="followupStats.defaulters"></span>)
+                                </button>
+                                <button type="button" @click="followupFilter = 'CONFIRMED'" 
+                                        class="px-2.5 py-1 rounded-lg font-medium transition"
+                                        :class="followupFilter === 'CONFIRMED' ? 'bg-emerald-700 text-white' : 'text-slate-600 hover:bg-slate-100'">
+                                    Confirmed
+                                </button>
+                            </div>
+
+                            <div class="relative w-full sm:w-64">
+                                <input type="text" x-model="followupSearch" placeholder="Search patient, hospital no, phone..." 
+                                       class="w-full text-xs pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <span class="absolute left-2.5 top-1.5 text-slate-400 text-xs">🔍</span>
+                            </div>
+                        </div>
+
+                        <!-- Table -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold text-[11px]">
+                                        <th class="px-4 py-2.5">Patient Details</th>
+                                        <th class="px-4 py-2.5">Phone Number</th>
+                                        <th class="px-4 py-2.5">Scheduled Return</th>
+                                        <th class="px-4 py-2.5">Clinical Indication & Meds</th>
+                                        <th class="px-4 py-2.5">Attending Clinician</th>
+                                        <th class="px-4 py-2.5">Outreach Status</th>
+                                        <th class="px-4 py-2.5 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <template x-for="appt in filteredFollowups()" :key="appt.hospital_number + appt.followup_date">
+                                        <tr class="hover:bg-slate-50/80 transition">
+                                            <td class="px-4 py-2.5">
+                                                <p class="font-bold text-slate-900" x-text="appt.patient_name"></p>
+                                                <p class="text-[11px] text-slate-500 font-mono" x-text="appt.hospital_number + ' • ' + appt.age + ' yrs • ' + appt.gender"></p>
+                                            </td>
+                                            <td class="px-4 py-2.5">
+                                                <a :href="'tel:' + appt.phone" class="font-mono text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1">
+                                                    <span>📞</span>
+                                                    <span x-text="appt.phone"></span>
+                                                </a>
+                                            </td>
+                                            <td class="px-4 py-2.5">
+                                                <div class="flex items-center gap-1.5">
+                                                    <span class="font-medium text-slate-800" x-text="appt.followup_date"></span>
+                                                    <template x-if="appt.status === 'Due Today'">
+                                                        <span class="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded">TODAY</span>
+                                                    </template>
+                                                    <template x-if="appt.status === 'Defaulter / Overdue'">
+                                                        <span class="px-1.5 py-0.2 bg-rose-100 text-rose-800 text-[10px] font-bold rounded">OVERDUE</span>
+                                                    </template>
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-2.5 max-w-xs">
+                                                <p class="text-slate-800 font-medium truncate" x-text="appt.primary_diagnosis"></p>
+                                                <p class="text-[11px] text-slate-500 truncate" x-text="'Rx: ' + appt.prescription"></p>
+                                            </td>
+                                            <td class="px-4 py-2.5 text-slate-700" x-text="appt.attending_clinician"></td>
+                                            <td class="px-4 py-2.5">
+                                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                                                      :class="{
+                                                          'bg-emerald-100 text-emerald-800 border border-emerald-300': appt.status === 'Confirmed',
+                                                          'bg-blue-100 text-blue-800 border border-blue-300': appt.status === 'Rescheduled',
+                                                          'bg-purple-100 text-purple-800 border border-purple-300': appt.status === 'Nurse Refill Given',
+                                                          'bg-rose-100 text-rose-800 border border-rose-300': appt.status === 'Defaulter / Overdue',
+                                                          'bg-amber-100 text-amber-800 border border-amber-300': appt.status === 'Due Today' || appt.status === 'Retry Call',
+                                                          'bg-slate-100 text-slate-700': appt.status === 'Pending Reminder'
+                                                      }"
+                                                      x-text="appt.status"></span>
+                                            </td>
+                                            <td class="px-4 py-2.5 text-right space-x-1 whitespace-nowrap">
+                                                <button type="button" @click="openCallModal(appt)" 
+                                                        class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded text-[11px] shadow-xs transition">
+                                                    📞 Call & Remind
+                                                </button>
+                                                <button type="button" @click="openDoctorAwayModal(appt)" 
+                                                        class="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-semibold rounded text-[11px] transition"
+                                                        title="Coordinate care if doctor is not on seat">
+                                                    🩺 Doctor Away
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 4. LOGGED OUTREACH CALLS & CLINICAL CONTINGENCY HISTORY -->
+                    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                        <div class="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                            <div>
+                                <h4 class="font-bold text-xs text-slate-900">Recent Outreach Calls & Contingency Care Log</h4>
+                                <p class="text-[10px] text-slate-500">Every phone reminder and doctor-absence resolution logged for continuous patient care.</p>
+                            </div>
+                            <span class="text-xs text-slate-500" x-text="callHistory.length + ' logs recorded'"></span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 text-[10px] font-semibold uppercase">
+                                        <th class="px-4 py-2">Date & Time</th>
+                                        <th class="px-4 py-2">Patient</th>
+                                        <th class="px-4 py-2">Phone Dialed</th>
+                                        <th class="px-4 py-2">Caller Staff</th>
+                                        <th class="px-4 py-2">Call Type</th>
+                                        <th class="px-4 py-2">Outcome</th>
+                                        <th class="px-4 py-2">Clinical Notes & Next Steps</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 text-slate-800">
+                                    <template x-for="call in callHistory" :key="call.id">
+                                        <tr class="hover:bg-slate-50/60 transition">
+                                            <td class="px-4 py-2 text-slate-500 font-mono text-[11px]" x-text="call.call_timestamp"></td>
+                                            <td class="px-4 py-2">
+                                                <b class="text-slate-900" x-text="call.patient_name"></b>
+                                                <span class="text-[10px] text-slate-500 font-mono block" x-text="call.hospital_number"></span>
+                                            </td>
+                                            <td class="px-4 py-2 font-mono text-slate-700" x-text="call.phone_dialed"></td>
+                                            <td class="px-4 py-2 font-medium" x-text="call.caller_name"></td>
+                                            <td class="px-4 py-2">
+                                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold"
+                                                      :class="call.call_type === 'DOCTOR_AWAY_CONTINGENCY' ? 'bg-amber-100 text-amber-900' : 'bg-blue-100 text-blue-900'"
+                                                      x-text="call.call_type === 'DOCTOR_AWAY_CONTINGENCY' ? 'Doctor Away Call' : 'Appointment Reminder'"></span>
+                                            </td>
+                                            <td class="px-4 py-2">
+                                                <span class="font-bold text-slate-900" x-text="call.call_outcome"></span>
+                                                <template x-if="call.rescheduled_date">
+                                                    <span class="text-[10px] text-blue-600 block" x-text="'New Date: ' + call.rescheduled_date"></span>
+                                                </template>
+                                            </td>
+                                            <td class="px-4 py-2 text-slate-600 max-w-sm" x-text="call.clinical_notes"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+
             </main>
         </div>
 
@@ -788,41 +1044,61 @@
          @click.self="showTransferSlipModal = false"
          @keydown.escape.window="showTransferSlipModal = false"
          x-cloak 
-         class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm overflow-y-auto p-3 sm:p-6 flex justify-center items-start">
+         class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm overflow-y-auto p-2 sm:p-4 flex justify-center items-start">
         
         <!-- FLOATING TOP ACTION BAR: ALWAYS FRONT & CENTER, ACCESSIBLE ON EVERY SCREEN -->
         <div class="fixed top-3 left-1/2 -translate-x-1/2 z-[100] bg-slate-900 text-white px-4 py-2 rounded-full shadow-2xl flex items-center space-x-2 border border-slate-700 no-print">
-            <button @click="showTransferSlipModal = false" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-full font-semibold text-xs flex items-center space-x-1 transition">
-                <span>←</span>
-                <span>Back</span>
+            <button type="button" @click="showTransferSlipModal = false" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-full font-semibold text-xs flex items-center space-x-1 transition border border-slate-600">
+                <span>← Back</span>
             </button>
             <div class="h-4 w-px bg-slate-700"></div>
-            <button @click="downloadReferralLetter()" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-full font-semibold text-xs flex items-center space-x-1 transition">
-                <span>⬇</span>
-                <span>Download (.html)</span>
+            <button type="button" @click="downloadReferralLetter()" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-semibold text-xs flex items-center space-x-1 shadow transition">
+                <span>⬇ Download (.html)</span>
             </button>
-            <button onclick="window.print()" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-full font-semibold text-xs flex items-center space-x-1 transition">
-                <span>🖨️</span>
-                <span>Print</span>
+            <button type="button" onclick="window.print()" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-full font-semibold text-xs flex items-center space-x-1 transition border border-slate-600">
+                <span>🖨️ Print</span>
             </button>
             <template x-if="selectedSlip && (!selectedSlip.handover_report || !selectedSlip.handover_report.is_confirmed)">
-                <button @click="openHandoverModal(selectedSlip.referral_id)" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-full text-xs shadow transition">
+                <button type="button" @click="openHandoverModal(selectedSlip.referral_id)" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-full text-xs shadow transition">
                     📝 Confirm Handover
                 </button>
             </template>
             <div class="h-4 w-px bg-slate-700"></div>
-            <button @click="showTransferSlipModal = false" class="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-full text-xs shadow transition flex items-center space-x-1">
-                <span>✕</span>
-                <span>CLOSE</span>
+            <button type="button" @click="showTransferSlipModal = false" class="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-full text-xs shadow transition flex items-center space-x-1">
+                <span>✕ CLOSE</span>
             </button>
         </div>
 
         <!-- Persistent Floating Close Button (ALWAYS VISIBLE AT TOP-RIGHT OF SCREEN) -->
-        <button @click="showTransferSlipModal = false" 
+        <button type="button" @click="showTransferSlipModal = false" 
                 class="fixed top-3 right-3 z-[110] bg-rose-600 hover:bg-rose-700 text-white border-2 border-white rounded-full w-10 h-10 flex items-center justify-center shadow-2xl font-bold text-lg transition no-print" 
                 title="Exit Letter (or press Esc)">✕</button>
 
-        <div class="max-w-xl w-full bg-white rounded-xl p-5 space-y-2.5 shadow-2xl my-2 relative border border-slate-300 text-xs leading-normal" id="printableSlip">
+        <div class="max-w-xl w-full bg-white rounded-xl shadow-2xl my-3 relative border border-slate-300 text-xs leading-normal overflow-hidden flex flex-col max-h-[92vh]">
+            
+            <!-- INTEGRATED TOP ACTION BAR ATTACHED DIRECTLY TO MODAL CARD -->
+            <div class="bg-slate-900 text-white px-4 py-2.5 flex justify-between items-center border-b border-slate-700 shrink-0 no-print">
+                <div class="flex items-center space-x-2">
+                    <button type="button" @click="showTransferSlipModal = false" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded font-semibold text-xs flex items-center space-x-1 transition border border-slate-700">
+                        <span>← Back to Referrals</span>
+                    </button>
+                    <span class="text-[11px] text-slate-400 font-mono hidden sm:inline" x-text="selectedSlip ? selectedSlip.slip_number : ''"></span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button type="button" @click="downloadReferralLetter()" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded transition flex items-center space-x-1 shadow-sm">
+                        <span>⬇ Download</span>
+                    </button>
+                    <button type="button" onclick="window.print()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded font-semibold text-xs flex items-center space-x-1 transition border border-slate-700">
+                        <span>🖨️ Print</span>
+                    </button>
+                    <button type="button" @click="showTransferSlipModal = false" class="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded shadow transition flex items-center space-x-1">
+                        <span>✕ CLOSE</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- SCROLLABLE PAPER BODY -->
+            <div class="p-5 overflow-y-auto space-y-2.5 text-xs text-slate-800 font-sans leading-normal" id="printableSlip">
             
             <!-- Letter Body: COMPACT SINGLE-PAGE CLINICAL CORRESPONDENCE (NO SCROLLING NEEDED) -->
             <template x-if="selectedSlip">
@@ -831,7 +1107,7 @@
                     <!-- Hospital Letterhead -->
                     <div class="border-b-2 border-slate-900 pb-2 flex justify-between items-start">
                         <div>
-                            <h2 class="text-xs font-bold uppercase tracking-tight text-slate-900" x-text="selectedSlip.facility_origin.name"></h2>
+                            <h2 class="text-xs font-bold uppercase tracking-tight text-slate-900" x-text="selectedSlip.facility_origin.name || 'ALAKIA PRIMARY HEALTHCARE CENTRE'"></h2>
                             <p class="text-[11px] text-slate-500">Official Clinical Referral & Patient Transfer Slip</p>
                         </div>
                         <div class="text-right text-[11px] text-slate-600">
@@ -931,7 +1207,7 @@
 
                 </div>
             </template>
-
+            </div>
         </div>
     </div>
 
@@ -1421,6 +1697,248 @@
         </div>
     </div>
 
+    <!-- 1. APPOINTMENT REMINDER & PHONE OUTREACH CALL MODAL -->
+    <div x-show="showCallModal" x-cloak class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div class="max-w-lg w-full bg-white rounded-2xl p-6 space-y-4 shadow-2xl border border-slate-200 my-6">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-100">
+                <div class="flex items-center space-x-2">
+                    <span class="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center text-base">📞</span>
+                    <div>
+                        <h3 class="font-bold text-sm text-slate-900">Patient Appointment Outreach Call</h3>
+                        <p class="text-[11px] text-slate-500">Contact patient to confirm attendance or update return schedule.</p>
+                    </div>
+                </div>
+                <button type="button" @click="showCallModal = false" class="text-slate-400 hover:text-slate-600 p-1 text-base font-bold">✕</button>
+            </div>
+
+            <!-- Patient Card & Phone Call Bar -->
+            <div class="bg-blue-50/70 border border-blue-200 rounded-xl p-3 flex justify-between items-center">
+                <div>
+                    <p class="font-bold text-slate-900 text-xs" x-text="callForm.patient_name"></p>
+                    <p class="text-[11px] text-slate-600 font-mono" x-text="'Hospital No: ' + callForm.hospital_number"></p>
+                </div>
+                <div class="text-right">
+                    <a :href="'tel:' + callForm.phone_dialed" 
+                       class="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs transition">
+                        <span>📱 Dial:</span>
+                        <span x-text="callForm.phone_dialed"></span>
+                    </a>
+                </div>
+            </div>
+
+            <form @submit.prevent="submitCallLog" class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Call Outcome / Patient Response <span class="text-rose-600">*</span></label>
+                    <select x-model="callForm.call_outcome" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-medium text-slate-900 focus:ring-2 focus:ring-blue-500" required>
+                        <option value="Appointment Confirmed">✅ Appointment Confirmed (Patient will attend on schedule)</option>
+                        <option value="Rescheduled">📅 Rescheduled (Patient requested new clinic return date)</option>
+                        <option value="Patient Feeling Well / Self-Discharged">💊 Patient Well / Self-Discharged (No further clinic review needed)</option>
+                        <option value="No Answer / Line Busy (Retry Required)">📵 No Answer / Line Busy (Scheduled for retry call)</option>
+                        <option value="Doctor Away - Rescheduled via Call">⚠️ Doctor Away - Rescheduled via Phone Outreach</option>
+                    </select>
+                </div>
+
+                <!-- Rescheduled Date if requested -->
+                <div x-show="callForm.call_outcome === 'Rescheduled' || callForm.call_outcome === 'Doctor Away - Rescheduled via Call'" x-cloak class="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                    <label class="block font-semibold text-amber-900 mb-1">New Rescheduled Appointment Date <span class="text-rose-600">*</span></label>
+                    <input type="date" x-model="callForm.rescheduled_date" class="w-full p-2 bg-white border border-amber-300 rounded-lg text-xs font-semibold text-slate-800">
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Caller Staff Name</label>
+                    <input type="text" x-model="callForm.caller_name" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 font-medium" required>
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Clinical Outreach Notes & Instructions Given</label>
+                    <textarea x-model="callForm.clinical_notes" rows="3" placeholder="Notes discussed with patient, e.g. reminded to bring ANC card and morning urine sample..." 
+                              class="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-slate-800 leading-relaxed" required></textarea>
+                </div>
+
+                <div class="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                    <button type="button" @click="showCallModal = false" class="px-4 py-2 border border-slate-300 text-slate-700 rounded-xl font-medium hover:bg-slate-50 transition">Cancel</button>
+                    <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs transition flex items-center space-x-1.5">
+                        <span>Save Call Record</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 2. DOCTOR NOT ON SEAT / PATIENT CARE COORDINATION MODAL -->
+    <div x-show="showDoctorAwayModal" x-cloak class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div class="max-w-lg w-full bg-white rounded-2xl p-6 space-y-4 shadow-2xl border border-slate-200 my-6">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-100">
+                <div class="flex items-center space-x-2">
+                    <span class="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center text-base">⚠️</span>
+                    <div>
+                        <h3 class="font-bold text-sm text-slate-900">Doctor Not on Seat — Clinical Coordination</h3>
+                        <p class="text-[11px] text-slate-500">Provide continuous care and guide patient on immediate next steps when the Medical Officer is away.</p>
+                    </div>
+                </div>
+                <button type="button" @click="showDoctorAwayModal = false" class="text-slate-400 hover:text-slate-600 p-1 text-base font-bold">✕</button>
+            </div>
+
+            <!-- Patient Selector -->
+            <div>
+                <label class="block font-semibold text-slate-700 mb-1">Select Arrived / Contacted Patient</label>
+                <select x-model="doctorAwayForm.patient_id" 
+                        @change="
+                            const p = patients.find(item => item.id === doctorAwayForm.patient_id || item.hospital_number === doctorAwayForm.patient_id);
+                            if (p) {
+                                doctorAwayForm.patient_name = cleanName(p);
+                                doctorAwayForm.hospital_number = p.hospital_number || p.ward_id || p.id;
+                                doctorAwayForm.phone_dialed = p.phone || '08000000000';
+                            }
+                        "
+                        class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-900 text-xs" required>
+                    <template x-for="p in patients" :key="p.id">
+                        <option :value="p.id" x-text="cleanName(p) + ' (' + (p.hospital_number || p.ward_id || p.id) + ') — Phone: ' + (p.phone || 'N/A')"></option>
+                    </template>
+                </select>
+            </div>
+
+            <!-- Call patient link -->
+            <div class="bg-amber-50/70 border border-amber-200 rounded-xl p-3 flex justify-between items-center text-xs">
+                <div>
+                    <span class="text-slate-600 block text-[10px]">Patient Phone:</span>
+                    <a :href="'tel:' + doctorAwayForm.phone_dialed" class="font-bold text-amber-900 font-mono text-sm hover:underline flex items-center gap-1">
+                        <span>📞</span>
+                        <span x-text="doctorAwayForm.phone_dialed"></span>
+                    </a>
+                </div>
+                <span class="text-[11px] text-amber-800 bg-amber-100 px-2 py-1 rounded-lg font-medium">Doctor Off-Site Protocol</span>
+            </div>
+
+            <form @submit.prevent="submitDoctorAwayCoordination" class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Clinical Next Step Decision <span class="text-rose-600">*</span></label>
+                    <div class="space-y-2">
+                        <label class="flex items-start gap-2.5 p-2.5 border rounded-xl cursor-pointer hover:bg-slate-50 transition"
+                               :class="doctorAwayForm.contingency_action === 'Step-Down Care by Duty Nurse Completed' ? 'border-blue-500 bg-blue-50/40' : 'border-slate-200'">
+                            <input type="radio" x-model="doctorAwayForm.contingency_action" value="Step-Down Care by Duty Nurse Completed" class="mt-0.5">
+                            <div>
+                                <b class="text-slate-900 block">🩺 Step-Down Care by Duty Nurse</b>
+                                <p class="text-[11px] text-slate-500">Nurse/CHEW checks vitals (BP, pulse, temp) and dispenses routine maintenance medication refill (Amlodipine, Metformin, ORS, etc.).</p>
+                            </div>
+                        </label>
+
+                        <label class="flex items-start gap-2.5 p-2.5 border rounded-xl cursor-pointer hover:bg-slate-50 transition"
+                               :class="doctorAwayForm.contingency_action === 'Rescheduled via Phone Call' ? 'border-blue-500 bg-blue-50/40' : 'border-slate-200'">
+                            <input type="radio" x-model="doctorAwayForm.contingency_action" value="Rescheduled via Phone Call" class="mt-0.5">
+                            <div>
+                                <b class="text-slate-900 block">📅 Reschedule Patient Visit via Phone Call</b>
+                                <p class="text-[11px] text-slate-500">Informed patient of doctor's expected return date. Booked new clinic appointment date.</p>
+                            </div>
+                        </label>
+
+                        <label class="flex items-start gap-2.5 p-2.5 border rounded-xl cursor-pointer hover:bg-slate-50 transition"
+                               :class="doctorAwayForm.contingency_action === 'Tele-Consult: Direct Call to Doctor' ? 'border-blue-500 bg-blue-50/40' : 'border-slate-200'">
+                            <input type="radio" x-model="doctorAwayForm.contingency_action" value="Tele-Consult: Direct Call to Doctor" class="mt-0.5">
+                            <div>
+                                <b class="text-slate-900 block">📱 Tele-Consult: Direct Mobile Call to Doctor</b>
+                                <p class="text-[11px] text-slate-500">Staff called Dr. Kemi Sanni directly on mobile for emergency verbal instructions and clinical prescription.</p>
+                            </div>
+                        </label>
+
+                        <label class="flex items-start gap-2.5 p-2.5 border rounded-xl cursor-pointer hover:bg-slate-50 transition"
+                               :class="doctorAwayForm.contingency_action === 'Initiated Emergency Transfer to Secondary Hospital' ? 'border-blue-500 bg-blue-50/40' : 'border-slate-200'">
+                            <input type="radio" x-model="doctorAwayForm.contingency_action" value="Initiated Emergency Transfer to Secondary Hospital" class="mt-0.5">
+                            <div>
+                                <b class="text-slate-900 block">🚑 Urgent Transfer to Secondary Hospital</b>
+                                <p class="text-[11px] text-slate-500">Patient presented with red-flag symptoms (severe preeclampsia, severe asthma, trauma); initiated transfer slip to Adeoyo or UCH.</p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div x-show="doctorAwayForm.contingency_action === 'Rescheduled via Phone Call'" x-cloak class="p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                    <label class="block font-semibold text-blue-900 mb-1">New Rescheduled Appointment Date</label>
+                    <input type="date" x-model="doctorAwayForm.rescheduled_date" class="w-full p-2 bg-white border border-blue-300 rounded-lg text-xs font-semibold text-slate-800">
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Clinical Coordination Notes & Care Provided</label>
+                    <textarea x-model="doctorAwayForm.clinical_notes" rows="3" 
+                              placeholder="Describe vital signs taken, medications dispensed, advice given to patient, or tele-consult findings..." 
+                              class="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-slate-800 leading-relaxed" required></textarea>
+                </div>
+
+                <div class="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                    <button type="button" @click="showDoctorAwayModal = false" class="px-4 py-2 border border-slate-300 text-slate-700 rounded-xl font-medium hover:bg-slate-50 transition">Cancel</button>
+                    <button type="submit" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-xs transition flex items-center space-x-1.5">
+                        <span>Save Clinical Action</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 3. SCHEDULE NEW FOLLOW-UP APPOINTMENT MODAL -->
+    <div x-show="showNewFollowupModal" x-cloak class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div class="max-w-md w-full bg-white rounded-2xl p-6 space-y-4 shadow-2xl border border-slate-200 my-6">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-100">
+                <div class="flex items-center space-x-2">
+                    <span class="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center text-base">➕</span>
+                    <div>
+                        <h3 class="font-bold text-sm text-slate-900">Schedule Patient Follow-Up</h3>
+                        <p class="text-[11px] text-slate-500">Set a return date for ANC, chronic checkup, or immunization review.</p>
+                    </div>
+                </div>
+                <button type="button" @click="showNewFollowupModal = false" class="text-slate-400 hover:text-slate-600 p-1 text-base font-bold">✕</button>
+            </div>
+
+            <form @submit.prevent="submitNewFollowup" class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Select Patient <span class="text-rose-600">*</span></label>
+                    <select x-model="newFollowupForm.patient_id" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-900 text-xs" required>
+                        <option value="">-- Choose Patient --</option>
+                        <template x-for="p in patients" :key="p.id">
+                            <option :value="p.id" x-text="cleanName(p) + ' (' + (p.hospital_number || p.ward_id || p.id) + ')'"></option>
+                        </template>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Return Date <span class="text-rose-600">*</span></label>
+                        <input type="date" x-model="newFollowupForm.followup_date" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 font-semibold" required>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Clinic Type</label>
+                        <select x-model="newFollowupForm.clinic_type" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-medium text-slate-900">
+                            <option value="ANC & Maternity Clinic">ANC & Maternity</option>
+                            <option value="Hypertension & Chronic Care">Hypertension / NCD</option>
+                            <option value="Diabetes Management">Diabetes Clinic</option>
+                            <option value="Child Immunization & Growth">Immunization / Child Health</option>
+                            <option value="General Outpatient Review">General OPD Review</option>
+                            <option value="Postnatal & Infant Wellness">Postnatal Review</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Attending Clinician</label>
+                    <input type="text" x-model="newFollowupForm.attending_clinician" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 font-medium">
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Clinical Instructions & Review Purpose</label>
+                    <textarea x-model="newFollowupForm.clinical_notes" rows="2" 
+                              placeholder="e.g. Repeat fasting blood sugar and check 30-day medication compliance..." 
+                              class="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-slate-800 leading-relaxed" required></textarea>
+                </div>
+
+                <div class="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                    <button type="button" @click="showNewFollowupModal = false" class="px-4 py-2 border border-slate-300 text-slate-700 rounded-xl font-medium hover:bg-slate-50 transition">Cancel</button>
+                    <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs transition flex items-center space-x-1">
+                        <span>Save Appointment</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- ==================== SCRIPT ENGINE ==================== -->
     <script>
         class WardVaultLocalVault {
@@ -1486,6 +2004,51 @@
                 showDischargeModal: false,
                 showOrderModal: false,
                 showEncounterModal: false,
+                showCallModal: false,
+                showDoctorAwayModal: false,
+                showNewFollowupModal: false,
+
+                // Follow-Up & Appointment Outreach State
+                followupAppointments: [],
+                followupStats: { total: 0, due_today: 0, defaulters: 0, calls_completed: 0 },
+                followupFilter: 'ALL',
+                followupSearch: '',
+                doctorDutyInfo: { id: 'PHC/26/MED/001', name: 'Dr. Kemi Sanni', speciality: 'Facility In-Charge & Chief Medical Officer', is_on_duty: true },
+                callHistory: [],
+
+                callForm: {
+                    patient_id: '',
+                    patient_name: '',
+                    hospital_number: '',
+                    encounter_id: null,
+                    call_type: 'APPOINTMENT_REMINDER',
+                    call_outcome: 'Appointment Confirmed',
+                    phone_dialed: '',
+                    rescheduled_date: '',
+                    caller_name: 'Nurse Folake Adeyemi',
+                    clinical_notes: '',
+                    doctor_status: 'ON_DUTY'
+                },
+
+                doctorAwayForm: {
+                    patient_id: '',
+                    patient_name: '',
+                    hospital_number: '',
+                    phone_dialed: '',
+                    contingency_action: 'Step-Down Care by Duty Nurse Completed',
+                    caller_name: 'Nurse Folake Adeyemi',
+                    rescheduled_date: '',
+                    clinical_notes: 'Doctor away on off-site outreach. Nurse checked baseline vitals and dispensed routine maintenance drug refill.',
+                    doctor_status: 'AWAY'
+                },
+
+                newFollowupForm: {
+                    patient_id: '',
+                    followup_date: '',
+                    clinic_type: 'ANC & Maternity Clinic',
+                    clinical_notes: 'Routine clinical review & medication check',
+                    attending_clinician: 'Dr. Kemi Sanni, MBBS'
+                },
 
                 // Active Data for Modals
                 selectedSlip: null,
@@ -1716,8 +2279,205 @@
                     await Promise.all([
                         this.fetchPatients(),
                         this.fetchAdmissions(),
-                        this.fetchReferrals()
+                        this.fetchReferrals(),
+                        this.fetchFollowups()
                     ]);
+                },
+
+                async fetchFollowups() {
+                    try {
+                        if (!this.token) await this.quickLogin('PHC/26/MED/001');
+                        const res = await fetch('/api/followups', {
+                            headers: { 'Authorization': `Bearer ${this.token}` }
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.followupAppointments = data.appointments || [];
+                            this.followupStats = data.stats || { total: 0, due_today: 0, defaulters: 0, calls_completed: 0 };
+                            if (data.doctor) this.doctorDutyInfo = data.doctor;
+                        }
+                        await this.fetchCallHistory();
+                    } catch(e) {
+                        console.error("Error fetching follow-ups:", e);
+                    }
+                },
+
+                async fetchCallHistory() {
+                    try {
+                        const res = await fetch('/api/followups/calls', {
+                            headers: { 'Authorization': `Bearer ${this.token}` }
+                        });
+                        if (res.ok) {
+                            this.callHistory = await res.json();
+                        }
+                    } catch(e) {}
+                },
+
+                async toggleDoctorDuty() {
+                    try {
+                        const newStatus = !this.doctorDutyInfo.is_on_duty;
+                        const res = await fetch('/api/providers/duty-status', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                            body: JSON.stringify({ provider_id: this.doctorDutyInfo.id || 'PHC/26/MED/001', is_on_duty: newStatus })
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.doctorDutyInfo.is_on_duty = data.is_on_duty;
+                            this.showToast(data.message);
+                            await this.fetchFollowups();
+                        }
+                    } catch(e) {
+                        this.showToast("Failed to update doctor status: " + e.message);
+                    }
+                },
+
+                openCallModal(appt) {
+                    this.callForm.patient_id = appt.patient_id;
+                    this.callForm.patient_name = appt.patient_name;
+                    this.callForm.hospital_number = appt.hospital_number;
+                    this.callForm.encounter_id = appt.id || null;
+                    this.callForm.phone_dialed = appt.phone || '08000000000';
+                    this.callForm.call_type = 'APPOINTMENT_REMINDER';
+                    this.callForm.call_outcome = 'Appointment Confirmed';
+                    this.callForm.rescheduled_date = '';
+                    this.callForm.caller_name = this.staffName || 'Nurse Folake Adeyemi';
+                    this.callForm.clinical_notes = `Appointment reminder call for return on ${appt.followup_date} (${appt.primary_diagnosis}). Patient confirmed attendance.`;
+                    this.callForm.doctor_status = this.doctorDutyInfo.is_on_duty ? 'ON_DUTY' : 'AWAY';
+                    this.showCallModal = true;
+                },
+
+                async submitCallLog() {
+                    try {
+                        const res = await fetch('/api/followups/call', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                            body: JSON.stringify(this.callForm)
+                        });
+                        if (res.ok) {
+                            this.showToast("Outreach call recorded successfully!");
+                            this.showCallModal = false;
+                            await this.fetchFollowups();
+                        } else {
+                            const err = await res.json();
+                            this.showToast(err.detail || "Failed to log call");
+                        }
+                    } catch(e) {
+                        this.showToast("Call logging error: " + e.message);
+                    }
+                },
+
+                openDoctorAwayModal(appt = null) {
+                    if (appt) {
+                        this.doctorAwayForm.patient_id = appt.patient_id;
+                        this.doctorAwayForm.patient_name = appt.patient_name;
+                        this.doctorAwayForm.hospital_number = appt.hospital_number;
+                        this.doctorAwayForm.phone_dialed = appt.phone || '08000000000';
+                    } else if (this.activePatient) {
+                        this.doctorAwayForm.patient_id = this.activePatient.id;
+                        this.doctorAwayForm.patient_name = this.cleanName(this.activePatient);
+                        this.doctorAwayForm.hospital_number = this.activePatient.hospital_number || this.activePatient.ward_id || this.activePatient.id;
+                        this.doctorAwayForm.phone_dialed = this.activePatient.phone || '08000000000';
+                    } else if (this.patients && this.patients.length > 0) {
+                        this.doctorAwayForm.patient_id = this.patients[0].id;
+                        this.doctorAwayForm.patient_name = this.cleanName(this.patients[0]);
+                        this.doctorAwayForm.hospital_number = this.patients[0].hospital_number || '';
+                        this.doctorAwayForm.phone_dialed = this.patients[0].phone || '08000000000';
+                    }
+                    this.doctorAwayForm.contingency_action = 'Step-Down Care by Duty Nurse Completed';
+                    this.doctorAwayForm.caller_name = this.staffName || 'Nurse Folake Adeyemi';
+                    this.doctorAwayForm.rescheduled_date = '';
+                    this.doctorAwayForm.clinical_notes = 'Doctor away on off-site outreach. Nurse checked baseline vitals and dispensed routine maintenance drug refill.';
+                    this.showDoctorAwayModal = true;
+                },
+
+                async submitDoctorAwayCoordination() {
+                    try {
+                        const payload = {
+                            patient_id: this.doctorAwayForm.patient_id,
+                            encounter_id: null,
+                            call_type: 'DOCTOR_AWAY_CONTINGENCY',
+                            call_outcome: this.doctorAwayForm.contingency_action,
+                            rescheduled_date: this.doctorAwayForm.rescheduled_date || null,
+                            phone_dialed: this.doctorAwayForm.phone_dialed,
+                            caller_name: this.doctorAwayForm.caller_name || this.staffName || 'Duty Clinician',
+                            clinical_notes: this.doctorAwayForm.clinical_notes,
+                            doctor_status: 'AWAY'
+                        };
+                        const res = await fetch('/api/followups/call', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                            body: JSON.stringify(payload)
+                        });
+                        if (res.ok) {
+                            this.showToast("Doctor-away coordination call & care recorded!");
+                            this.showDoctorAwayModal = false;
+                            await this.fetchFollowups();
+                        } else {
+                            const err = await res.json();
+                            this.showToast(err.detail || "Failed to save coordination call");
+                        }
+                    } catch(e) {
+                        this.showToast("Error saving coordination: " + e.message);
+                    }
+                },
+
+                openNewFollowupModal(patientId = null) {
+                    this.newFollowupForm.patient_id = patientId || (this.activePatient ? this.activePatient.id : (this.patients[0]?.id || ''));
+                    const d = new Date();
+                    d.setDate(d.getDate() + 7);
+                    this.newFollowupForm.followup_date = d.toISOString().split('T')[0];
+                    this.newFollowupForm.clinic_type = 'ANC & Maternity Clinic';
+                    this.newFollowupForm.clinical_notes = 'Routine follow-up review and medication check';
+                    this.newFollowupForm.attending_clinician = 'Dr. Kemi Sanni, MBBS';
+                    this.showNewFollowupModal = true;
+                },
+
+                async submitNewFollowup() {
+                    try {
+                        const res = await fetch('/api/followups/new', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                            body: JSON.stringify(this.newFollowupForm)
+                        });
+                        if (res.ok) {
+                            this.showToast("New follow-up appointment scheduled!");
+                            this.showNewFollowupModal = false;
+                            await this.fetchFollowups();
+                        } else {
+                            const err = await res.json();
+                            this.showToast(err.detail || "Failed to schedule follow-up");
+                        }
+                    } catch(e) {
+                        this.showToast("Error scheduling: " + e.message);
+                    }
+                },
+
+                filteredFollowups() {
+                    const today = new Date().toISOString().split('T')[0];
+                    const q = (this.followupSearch || '').toLowerCase().trim();
+                    return this.followupAppointments.filter(a => {
+                        if (q) {
+                            const matchName = (a.patient_name || '').toLowerCase().includes(q);
+                            const matchHosp = (a.hospital_number || '').toLowerCase().includes(q);
+                            const matchPhone = (a.phone || '').toLowerCase().includes(q);
+                            const matchDiag = (a.primary_diagnosis || '').toLowerCase().includes(q);
+                            if (!matchName && !matchHosp && !matchPhone && !matchDiag) return false;
+                        }
+                        if (this.followupFilter === 'TODAY') {
+                            return a.followup_date === today;
+                        } else if (this.followupFilter === 'WEEK') {
+                            const target = new Date(a.followup_date);
+                            const now = new Date();
+                            const diffDays = (target - now) / (1000 * 60 * 60 * 24);
+                            return diffDays >= -1 && diffDays <= 7;
+                        } else if (this.followupFilter === 'DEFAULTERS') {
+                            return a.followup_date < today && !a.status.includes('Confirmed');
+                        } else if (this.followupFilter === 'CONFIRMED') {
+                            return a.status.includes('Confirmed');
+                        }
+                        return true;
+                    });
                 },
 
                 async fetchPatients() {

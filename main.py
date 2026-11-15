@@ -21,6 +21,34 @@ from auth import verify_password, create_access_token, oauth2_scheme
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await db.connect()
+    # Ensure followup and appointment tables exist
+    async with db.legacy_pool.acquire() as conn:
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS followup_calls (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                encounter_id INTEGER,
+                patient_id TEXT NOT NULL,
+                call_type TEXT NOT NULL,
+                call_timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                caller_name TEXT NOT NULL,
+                phone_dialed TEXT NOT NULL,
+                call_outcome TEXT NOT NULL,
+                rescheduled_date TEXT,
+                clinical_notes TEXT,
+                doctor_status TEXT DEFAULT 'ON_DUTY'
+            )
+        """)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS scheduled_followups (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id TEXT NOT NULL,
+                followup_date TEXT NOT NULL,
+                clinic_type TEXT NOT NULL,
+                clinical_notes TEXT,
+                attending_clinician TEXT DEFAULT 'Dr. Kemi Sanni, MBBS',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
     yield
     await db.disconnect()
 
@@ -135,6 +163,28 @@ class BatchSyncRequest(BaseModel):
 class ThreatReportRequest(BaseModel):
     patient_id: str
     description: str
+
+class FollowupCallRequest(BaseModel):
+    patient_id: str
+    encounter_id: Optional[int] = None
+    call_type: str = "APPOINTMENT_REMINDER"  # APPOINTMENT_REMINDER, DOCTOR_AWAY_CONTINGENCY, DEFAULTER_RECALL, ROUTINE_FOLLOWUP
+    call_outcome: str  # Appointment Confirmed, Rescheduled, Step-Down Care by Nurse Completed, Emergency Transfer Initiated, Tele-Consult Completed, No Answer / Retry Required, Patient Self-Discharged
+    rescheduled_date: Optional[str] = None
+    phone_dialed: str
+    caller_name: str
+    clinical_notes: str
+    doctor_status: Optional[str] = "ON_DUTY"
+
+class NewFollowupRequest(BaseModel):
+    patient_id: str
+    followup_date: str
+    clinic_type: str = "General Outpatient Review"
+    clinical_notes: str = ""
+    attending_clinician: Optional[str] = "Dr. Kemi Sanni, MBBS"
+
+class ProviderDutyRequest(BaseModel):
+    provider_id: str
+    is_on_duty: bool
 
 # --- HEALTH & STATIC SERVING ---
 @app.get("/health")
@@ -785,6 +835,265 @@ CONFIRMED_AT: {confirmed_timestamp}
         )
 
         return {"status": "success", "message": f"Referral status updated to {req.status}"}
+
+# --- CLINICAL FOLLOW-UP, APPOINTMENT REMINDERS & DOCTOR AVAILABILITY COORDINATION ---
+@app.get("/api/followups")
+async def get_followups(user: dict = Depends(get_current_user)):
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    async with db.legacy_pool.acquire() as conn:
+        # 1. Fetch Medical Officer (Dr. Kemi Sanni) duty status
+        doc = await conn.fetchrow("""
+            SELECT id, name, speciality, is_on_duty 
+            FROM providers 
+            WHERE speciality LIKE '%Medical Officer%' OR speciality LIKE '%Doctor%' OR id = 'PHC/26/MED/001'
+            LIMIT 1
+        """)
+        doc_info = {
+            "id": doc["id"] if doc else "PHC/26/MED/001",
+            "name": doc["name"] if doc else "Dr. Kemi Sanni",
+            "speciality": doc["speciality"] if doc else "Facility In-Charge (Chief Medical Officer)",
+            "is_on_duty": bool(doc["is_on_duty"]) if doc and doc.get("is_on_duty") is not None else True
+        }
+
+        # 2. Encounters with follow-up dates
+        enc_rows = await conn.fetch("""
+            SELECT ce.id as encounter_id, ce.patient_id, ce.primary_diagnosis, ce.prescription, 
+                   ce.followup_date, ce.outcome, ce.clinician_name, ce.timestamp as encounter_time,
+                   p.name as patient_name, p.hospital_number, p.ward_id as folder_number,
+                   p.age, p.gender, p.phone, p.condition
+            FROM clinical_encounters ce
+            LEFT JOIN patients p ON (ce.patient_id = p.id OR ce.patient_id = p.hospital_number)
+            WHERE ce.followup_date IS NOT NULL AND ce.followup_date != ''
+            ORDER BY ce.followup_date ASC
+        """)
+
+        # 3. Scheduled follow-ups
+        sched_rows = await conn.fetch("""
+            SELECT sf.id as sched_id, sf.patient_id, sf.clinic_type as primary_diagnosis, sf.clinical_notes as prescription,
+                   sf.followup_date, 'Scheduled' as outcome, sf.attending_clinician as clinician_name, sf.created_at as encounter_time,
+                   p.name as patient_name, p.hospital_number, p.ward_id as folder_number,
+                   p.age, p.gender, p.phone, p.condition
+            FROM scheduled_followups sf
+            LEFT JOIN patients p ON (sf.patient_id = p.id OR sf.patient_id = p.hospital_number)
+            ORDER BY sf.followup_date ASC
+        """)
+
+        # 4. Calls
+        all_calls = await conn.fetch("SELECT * FROM followup_calls ORDER BY id DESC")
+        calls_by_patient = {}
+        for c in all_calls:
+            pid = c["patient_id"]
+            if pid not in calls_by_patient:
+                calls_by_patient[pid] = []
+            calls_by_patient[pid].append({
+                "id": c["id"],
+                "encounter_id": c["encounter_id"],
+                "call_type": c["call_type"],
+                "call_timestamp": str(c["call_timestamp"]),
+                "caller_name": c["caller_name"],
+                "phone_dialed": c["phone_dialed"],
+                "call_outcome": c["call_outcome"],
+                "rescheduled_date": c["rescheduled_date"],
+                "clinical_notes": c["clinical_notes"],
+                "doctor_status": c["doctor_status"]
+            })
+
+    combined = []
+    seen_keys = set()
+
+    all_raw = list(enc_rows) + list(sched_rows)
+    for r in all_raw:
+        hosp_no = r.get("hospital_number") or r.get("folder_number") or r["patient_id"]
+        key = f"{hosp_no}_{r['followup_date']}"
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+
+        p_calls = calls_by_patient.get(r["patient_id"], []) + calls_by_patient.get(hosp_no, [])
+        latest_call = p_calls[0] if p_calls else None
+
+        f_date = r["followup_date"]
+        # Determine status
+        if latest_call:
+            call_outcome = latest_call["call_outcome"]
+            if "Confirmed" in call_outcome:
+                status = "Confirmed"
+            elif "Rescheduled" in call_outcome:
+                status = "Rescheduled"
+            elif "Step-Down" in call_outcome or "Nurse" in call_outcome:
+                status = "Nurse Refill Given"
+            elif "Transfer" in call_outcome:
+                status = "Transferred"
+            elif "No Answer" in call_outcome or "Retry" in call_outcome:
+                status = "Retry Call"
+            else:
+                status = call_outcome
+        else:
+            if f_date < today_str:
+                status = "Defaulter / Overdue"
+            elif f_date == today_str:
+                status = "Due Today"
+            else:
+                status = "Pending Reminder"
+
+        combined.append({
+            "id": r.get("encounter_id") or r.get("sched_id") or 0,
+            "patient_id": r["patient_id"],
+            "patient_name": r.get("patient_name") or "Patient",
+            "hospital_number": hosp_no,
+            "age": r.get("age") or "Adult",
+            "gender": r.get("gender") or "—",
+            "phone": r.get("phone") or "08000000000",
+            "condition": r.get("condition") or "General Clinic",
+            "followup_date": f_date,
+            "primary_diagnosis": r.get("primary_diagnosis") or "Clinical Review",
+            "prescription": r.get("prescription") or "Routine maintenance drugs",
+            "attending_clinician": r.get("clinician_name") or "Dr. Kemi Sanni, MBBS",
+            "status": status,
+            "latest_call": latest_call,
+            "call_history": p_calls[:5]
+        })
+
+    def sort_key(item):
+        d = item["followup_date"]
+        if item["status"] == "Due Today":
+            return (0, d)
+        elif d >= today_str:
+            return (1, d)
+        else:
+            return (2, d)
+
+    combined.sort(key=sort_key)
+
+    total = len(combined)
+    due_today = sum(1 for c in combined if c["followup_date"] == today_str)
+    defaulters = sum(1 for c in combined if c["followup_date"] < today_str and "Confirmed" not in c["status"])
+    calls_completed = len(all_calls)
+
+    return {
+        "doctor": doc_info,
+        "appointments": combined,
+        "stats": {
+            "total": total,
+            "due_today": due_today,
+            "defaulters": defaulters,
+            "calls_completed": calls_completed
+        }
+    }
+
+@app.post("/api/followups/call")
+async def log_followup_call(req: FollowupCallRequest, user: dict = Depends(get_current_user)):
+    staff_id = user["sub"]
+    caller = req.caller_name or user.get("name") or "Duty Staff"
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    async with db.legacy_pool.acquire() as conn:
+        call_id = await conn.fetchval("""
+            INSERT INTO followup_calls (
+                encounter_id, patient_id, call_type, call_timestamp, caller_name,
+                phone_dialed, call_outcome, rescheduled_date, clinical_notes, doctor_status
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id
+        """, req.encounter_id, req.patient_id, req.call_type, ts, caller,
+             req.phone_dialed, req.call_outcome, req.rescheduled_date, req.clinical_notes, req.doctor_status)
+
+        # If rescheduled date given, update encounter followup_date
+        if req.rescheduled_date and req.encounter_id:
+            await conn.execute("""
+                UPDATE clinical_encounters 
+                SET followup_date = $1 
+                WHERE id = $2
+            """, req.rescheduled_date, req.encounter_id)
+        
+        # If doctor away nurse step-down care completed, append a clinical progress note
+        if req.call_type == "DOCTOR_AWAY_CONTINGENCY" or "Nurse Step-Down" in req.call_outcome:
+            await conn.execute("""
+                INSERT INTO clinical_notes (patient_id, provider_id, note_text, timestamp)
+                VALUES ($1, $2, $3, $4)
+            """, req.patient_id, staff_id, f"CONTINGENCY CARE (Doctor Away): {req.call_outcome}. Notes: {req.clinical_notes}. Caller: {caller}", ts)
+
+    await log_access_event(
+        staff_id,
+        "PHONE_OUTREACH_CALL",
+        req.patient_id,
+        f"{req.call_type}: {req.call_outcome} to {req.phone_dialed} ({req.clinical_notes[:60]})"
+    )
+
+    return {
+        "status": "success",
+        "call_id": call_id,
+        "message": f"Phone outreach call recorded successfully ({req.call_outcome})."
+    }
+
+@app.post("/api/followups/new")
+async def create_scheduled_followup(req: NewFollowupRequest, user: dict = Depends(get_current_user)):
+    staff_id = user["sub"]
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    async with db.legacy_pool.acquire() as conn:
+        sf_id = await conn.fetchval("""
+            INSERT INTO scheduled_followups (
+                patient_id, followup_date, clinic_type, clinical_notes, attending_clinician, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id
+        """, req.patient_id, req.followup_date, req.clinic_type, req.clinical_notes, req.attending_clinician, ts)
+
+    await log_access_event(
+        staff_id,
+        "FOLLOWUP_SCHEDULED",
+        req.patient_id,
+        f"Scheduled appointment on {req.followup_date} for {req.clinic_type}"
+    )
+    return {"status": "success", "id": sf_id, "message": "Appointment scheduled successfully."}
+
+@app.post("/api/providers/duty-status")
+async def update_provider_duty_status(req: ProviderDutyRequest, user: dict = Depends(get_current_user)):
+    staff_id = user["sub"]
+    async with db.legacy_pool.acquire() as conn:
+        await conn.execute("""
+            UPDATE providers SET is_on_duty = $1 WHERE id = $2
+        """, 1 if req.is_on_duty else 0, req.provider_id)
+        
+        provider = await conn.fetchrow("SELECT name, speciality, is_on_duty FROM providers WHERE id = $1", req.provider_id)
+
+    status_str = "ON DUTY (In Clinic)" if req.is_on_duty else "AWAY (Off-Site / Outreach)"
+    await log_access_event(
+        staff_id,
+        "PROVIDER_DUTY_CHANGED",
+        req.provider_id,
+        f"{provider['name']} duty status changed to {status_str}"
+    )
+    return {
+        "status": "success",
+        "provider_id": req.provider_id,
+        "is_on_duty": bool(provider["is_on_duty"]),
+        "message": f"Provider duty status updated to: {status_str}"
+    }
+
+@app.get("/api/followups/calls")
+async def get_followup_call_history(user: dict = Depends(get_current_user)):
+    async with db.legacy_pool.acquire() as conn:
+        calls = await conn.fetch("""
+            SELECT fc.*, p.name as patient_name, p.hospital_number, p.ward_id as folder_number
+            FROM followup_calls fc
+            LEFT JOIN patients p ON (fc.patient_id = p.id OR fc.patient_id = p.hospital_number)
+            ORDER BY fc.id DESC LIMIT 50
+        """)
+        return [
+            {
+                "id": c["id"],
+                "encounter_id": c["encounter_id"],
+                "patient_id": c["patient_id"],
+                "patient_name": c.get("patient_name") or c["patient_id"],
+                "hospital_number": c.get("hospital_number") or c.get("folder_number") or c["patient_id"],
+                "call_type": c["call_type"],
+                "call_timestamp": str(c["call_timestamp"]),
+                "caller_name": c["caller_name"],
+                "phone_dialed": c["phone_dialed"],
+                "call_outcome": c["call_outcome"],
+                "rescheduled_date": c["rescheduled_date"],
+                "clinical_notes": c["clinical_notes"],
+                "doctor_status": c["doctor_status"]
+            }
+            for c in calls
+        ]
 
 # --- PAPER INTAKE AUDIT & RESOLUTION ---
 @app.get("/api/paper-intakes/flagged")
