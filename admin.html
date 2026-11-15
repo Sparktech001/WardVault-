@@ -132,10 +132,12 @@
                         <span class="text-slate-400 font-bold">Action:</span>
                         <select x-model="filterAction" class="bg-slate-950 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-lg outline-none font-mono">
                             <option value="">All Actions</option>
+                            <option value="ENCOUNTER">Clinical Encounters</option>
+                            <option value="REFERRAL">Secondary Referrals</option>
+                            <option value="PAPER">Paper Folder Migration</option>
                             <option value="GRANTED">Access Granted</option>
-                            <option value="DENIED">Access Denied</option>
+                            <option value="DENIED">Access Denied (ABAC)</option>
                             <option value="OVERRIDE">Emergency Overrides</option>
-                            <option value="VIOLATION">Security Violations</option>
                             <option value="DETECTED">Threats Detected</option>
                         </select>
                     </div>
@@ -314,14 +316,14 @@
 
                 async fetchLogs() {
                     try {
-                        let res = await fetch('http://127.0.0.1:8000/api/audit-logs');
+                        let res = await fetch('/api/audit-logs');
                         if (res.ok) this.logs = await res.json();
                     } catch (err) { console.error("Failed to fetch logs", err); }
                 },
 
                 async fetchClinicalNotes() {
                     try {
-                        let res = await fetch('http://127.0.0.1:8000/api/admin/clinical-notes');
+                        let res = await fetch('/api/admin/clinical-notes');
                         if (res.ok) this.clinicalNotes = await res.json();
                     } catch (err) { console.error("Failed to fetch clinical notes", err); }
                 },
@@ -329,7 +331,7 @@
                 async verifyLedger() {
                     this.verifyStatus = null;
                     try {
-                        let res = await fetch('http://127.0.0.1:8000/api/audit/verify');
+                        let res = await fetch('/api/audit/verify');
                         let data = await res.json();
                         this.verifyStatus = data.status;
                         if (data.status === 'COMPROMISED') {
@@ -347,7 +349,7 @@
                     if(!confirm("WARNING: This permanently deletes all audit logs and resets the cryptographic chain to genesis. Only do this before starting a fresh demo. Continue?")) return;
                     
                     try {
-                        let res = await fetch('http://127.0.0.1:8000/api/admin/reset-ledger', { method: 'POST' });
+                        let res = await fetch('/api/admin/reset-ledger', { method: 'POST' });
                         if(res.ok) {
                             alert("Ledger completely wiped. Cryptographic chain reset to genesis block.");
                             this.verifyStatus = null;

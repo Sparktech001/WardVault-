@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WardVault | Clinical Access Gateway</title>
+    <title>WardVault PHC | Primary Healthcare Records & Care Coordination</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     
@@ -16,7 +16,7 @@
                         mono: ['JetBrains Mono', 'Consolas', 'monospace'],
                     },
                     colors: {
-                        clinical: { 50: '#f8fafc', 100: '#f1f5f9', 800: '#1e293b', 900: '#0f172a', 950: '#020617' }
+                        phc: { 50: '#f0fdf4', 100: '#dcfce7', 500: '#22c55e', 600: '#16a34a', 700: '#15803d', 900: '#14532d' }
                     }
                 }
             }
@@ -24,59 +24,47 @@
     </script>
     <style>
         [x-cloak] { display: none !important; }
-        body { transition: background-color 0.5s ease; }
+        body { transition: background-color 0.4s ease; }
         .bg-downtime { background-color: #fffbeb !important; }
         @keyframes pulse-slow {
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.95; transform: scale(0.995); }
         }
-        .emergency-pulse { animation: pulse-slow 2s infinite ease-in-out; }
+        .pulse-subtle { animation: pulse-slow 2.5s infinite ease-in-out; }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col items-center justify-center p-4 selection:bg-blue-500 selection:text-white" :class="isOffline ? 'bg-downtime' : ''" x-data="wardVault()">
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col p-4 md:p-6" :class="isOffline ? 'bg-downtime' : ''" x-data="wardVaultPHC()">
 
-    <!-- GLOBAL ALERT BANNERS -->
-    <div class="fixed top-0 left-0 right-0 z-[60] flex flex-col items-center pt-2 space-y-2 pointer-events-none">
-        
-        <!-- Abuse Detection Alert -->
-        <div x-show="securityAlert" x-cloak x-transition class="bg-rose-600 text-white px-6 py-3 rounded-xl shadow-2xl border-b-4 border-rose-800 font-bold flex items-center space-x-3 pointer-events-auto">
-            <span class="text-xl">🚨</span>
-            <span>SECURITY ALERT: Suspicious Activity Detected. Unauthorized access threshold exceeded.</span>
-            <button @click="resetSecurity()" class="ml-4 text-rose-200 hover:text-white underline text-xs">Acknowledge</button>
+    <!-- TOP NOTIFICATIONS & SYSTEM HARDWARE STATUS -->
+    <div class="fixed top-0 left-0 right-0 z-[60] flex flex-col items-center pt-2 space-y-2 pointer-events-none px-4">
+        <div x-show="isOffline" x-cloak x-transition class="bg-amber-600 text-white px-5 py-2.5 rounded-xl shadow-xl font-bold text-xs flex items-center space-x-3 pointer-events-auto">
+            <span class="text-base">📡</span>
+            <span>OFFLINE LOCAL MODE ACTIVE: Operating on Local IndexedDB Cache. Internet disconnected.</span>
         </div>
-
-        <!-- LIVE Hardware Battery Alerts -->
-        <div x-show="batteryState === 'running'" x-cloak x-transition class="bg-amber-500 text-amber-950 px-6 py-2 rounded-xl shadow-xl font-bold flex items-center space-x-3">
-            <span>⚡ EXTERNAL POWER LOST: Running on Battery (<span x-text="batteryLevelPct"></span>%)</span>
+        <div x-show="batteryState === 'running'" x-cloak x-transition class="bg-orange-500 text-white px-5 py-2 rounded-xl shadow-lg font-bold text-xs flex items-center space-x-3 pointer-events-auto">
+            <span>⚡ AC POWER LOST: Running on Inverter/Battery (<span x-text="batteryLevelPct"></span>%)</span>
         </div>
-        <div x-show="batteryState === 'low'" x-cloak x-transition class="bg-red-600 text-white px-6 py-3 rounded-xl shadow-2xl border-b-4 border-red-800 font-bold flex items-center space-x-3">
-            <span class="text-xl">🔋</span>
-            <span>CRITICAL: Battery Low (<span x-text="batteryLevelPct"></span>%). Connect backup power or follow hospital downtime procedure.</span>
+        <div x-show="batteryState === 'low'" x-cloak x-transition class="bg-red-600 text-white px-5 py-2.5 rounded-xl shadow-2xl font-bold text-xs flex items-center space-x-3 pointer-events-auto">
+            <span class="text-base">🔋</span>
+            <span>CRITICAL BATTERY LOW (<span x-text="batteryLevelPct"></span>%): Switch to solar generator immediately.</span>
         </div>
-
-        <!-- Auto-Sync Feedback -->
-        <div x-show="syncing" x-cloak class="bg-blue-600 text-white px-6 py-2 rounded-xl shadow-md font-bold text-xs flex items-center pointer-events-auto transition-all">
-            <span class="animate-spin mr-2">↻</span> Synchronizing offline data...
+        <div x-show="syncing" x-cloak class="bg-blue-600 text-white px-5 py-2 rounded-xl shadow-md font-bold text-xs flex items-center pointer-events-auto">
+            <span class="animate-spin mr-2">↻</span> Synchronizing local queue to Central Cloud Gateway...
         </div>
-        <div x-show="syncComplete" x-cloak class="bg-emerald-500 text-white px-6 py-2 rounded-xl shadow-md font-bold text-xs flex items-center transition-all">
-            ✓ Synced to Central Ledger
+        <div x-show="syncComplete" x-cloak class="bg-emerald-600 text-white px-5 py-2 rounded-xl shadow-md font-bold text-xs flex items-center pointer-events-auto">
+            ✓ Facility Records Synced & Cryptographically Verified!
         </div>
     </div>
 
-    <!-- LOGIN SCREEN -->
-    <div class="max-w-md w-full bg-white border border-slate-200 shadow-xl rounded-2xl p-8 mt-10" x-show="!token" x-transition.opacity>
-        <div class="flex items-center space-x-3 mb-6 pb-6 border-b border-slate-100">
-            <div class="h-11 w-11 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
-                <template x-if="!username">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
-                </template>
-                <template x-if="username">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                </template>
+    <!-- 1. LOGIN SCREEN -->
+    <div class="max-w-md w-full mx-auto my-auto bg-white border border-slate-200 shadow-xl rounded-2xl p-7 mt-8" x-show="!token" x-transition.opacity>
+        <div class="flex items-center space-x-3 mb-6 pb-5 border-b border-slate-100">
+            <div class="h-11 w-11 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 text-xl font-bold">
+                🏥
             </div>
             <div>
-               <h2 class="text-lg font-bold text-slate-900 tracking-tight">WardVault EHR</h2>
-               <p class="text-xs text-slate-500 font-medium">Hospital Secure Gateway</p>
+               <h2 class="text-lg font-black text-slate-900 tracking-tight">WardVault PHC</h2>
+               <p class="text-xs text-slate-500 font-medium">Primary Healthcare Records & Care Coordination</p>
             </div>
         </div>
 
@@ -89,299 +77,612 @@
 
         <form @submit.prevent="login" class="space-y-4">
             <div>
-                <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Provider ID</label>
-                <input type="text" x-model="username" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-200 outline-none transition" placeholder="e.g. UCH/26/EME/2980" required>
+                <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Staff Provider ID</label>
+                <input type="text" x-model="username" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-200 outline-none transition" placeholder="e.g. PHC/26/CHEW/102" required>
             </div>
             <div>
-                <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Secure Passphrase</label>
-                <input type="password" x-ref="passInput" x-model="password" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-200 outline-none transition" required>
+                <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Passphrase</label>
+                <input type="password" x-model="password" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-200 outline-none transition" required>
             </div>
-            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition shadow-sm" x-text="loading ? 'Authenticating...' : 'Sign In to Ward'"></button>
+            <button type="submit" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-2.5 rounded-xl text-sm transition shadow-sm" x-text="loading ? 'Authenticating Station...' : 'Sign In to PHC Station'"></button>
         </form>
+
+        <!-- Quick Demo Switcher -->
+        <div class="mt-6 pt-5 border-t border-slate-100">
+            <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2.5 text-center">Quick Demo Accounts (USPF 2026 Evaluation)</p>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+                <button @click="quickLogin('PHC/26/CHEW/102')" class="p-2 text-left bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-lg transition">
+                    <span class="font-bold text-slate-800 block">Amina Bello</span>
+                    <span class="text-[10px] text-emerald-700 font-semibold">CHEW (On Duty)</span>
+                </button>
+                <button @click="quickLogin('PHC/26/NUR/103')" class="p-2 text-left bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-lg transition">
+                    <span class="font-bold text-slate-800 block">Nurse Folake</span>
+                    <span class="text-[10px] text-emerald-700 font-semibold">Nurse / Midwife</span>
+                </button>
+                <button @click="quickLogin('PHC/26/REC/101')" class="p-2 text-left bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-lg transition">
+                    <span class="font-bold text-slate-800 block">Ibrahim Musa</span>
+                    <span class="text-[10px] text-blue-700 font-semibold">Records Officer</span>
+                </button>
+                <button @click="quickLogin('PHC/26/CHEW/105')" class="p-2 text-left bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-300 rounded-lg transition">
+                    <span class="font-bold text-slate-800 block">V. Cartwright</span>
+                    <span class="text-[10px] text-rose-700 font-semibold">CHEW (OFF DUTY)</span>
+                </button>
+            </div>
+            <p class="text-[10px] text-slate-400 text-center mt-2">Password for all accounts: <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-600">password123</code></p>
+        </div>
     </div>
 
-    <!-- MAIN CLINICAL DASHBOARD -->
-    <div class="max-w-4xl w-full mx-auto space-y-4 mt-10" x-show="token && !securityAlert" x-cloak x-transition.opacity>
+    <!-- 2. MAIN CLINICAL DASHBOARD (AUTHENTICATED) -->
+    <div class="max-w-7xl w-full mx-auto space-y-5" x-show="token" x-cloak>
         
-        <!-- HEADER -->
-        <div class="bg-white border border-slate-200 shadow-sm rounded-2xl p-4 flex flex-wrap justify-between items-center gap-3">
+        <!-- Header Bar -->
+        <header class="bg-white border border-slate-200 shadow-sm rounded-2xl p-4 flex flex-wrap justify-between items-center gap-3">
             <div class="flex items-center space-x-3">
-                <div class="h-9 w-9 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 font-bold text-sm">
-                    +
+                <div class="h-10 w-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center text-lg font-bold shadow-sm">
+                    🏥
                 </div>
                 <div>
                     <div class="flex items-center space-x-2">
-                        <h1 class="text-sm font-bold text-slate-900" x-text="orgName"></h1>
-                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors flex items-center"
-                              :class="isOffline ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-emerald-100 text-emerald-700 border-emerald-200'">
-                              <span x-show="isOffline" class="w-2 h-2 rounded-full bg-amber-500 mr-1.5 animate-pulse"></span>
-                              <span x-text="isOffline ? 'Offline Mode (Cached)' : 'Gateway Online'"></span>
+                        <h1 class="text-base font-black text-slate-900 leading-tight">WardVault PHC</h1>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">Alakia PHC (Oyo State)</span>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border transition-colors"
+                              :class="isOffline ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-emerald-50 text-emerald-700 border-emerald-200'">
+                              <span x-text="isOffline ? 'Offline Mode (Local Cache)' : 'Gateway Online (LAN/Cloud)'"></span>
                         </span>
                     </div>
-                    <!-- ON DUTY SHIFT BADGE -->
-                    <div class="flex items-center mt-1">
-                        <p class="text-xs text-slate-500 font-medium">Active Staff Session: <strong class="text-slate-700" x-text="role"></strong> (<span x-text="providerId"></span>)</p>
-                        <span class="ml-2 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-colors"
-                              :class="onDuty ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-200 text-slate-500 border border-slate-300'">
+                    <div class="flex items-center space-x-2 mt-0.5">
+                        <p class="text-xs text-slate-500 font-medium">Station: <strong class="text-slate-800" x-text="staffName"></strong> (<span x-text="role"></span> • <span x-text="providerId"></span>)</p>
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                              :class="onDuty ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-rose-100 text-rose-800 border border-rose-200'">
                             <span x-text="onDuty ? '🟢 ON DUTY' : '⚫ OFF DUTY'"></span>
                         </span>
                     </div>
                 </div>
             </div>
-            <button @click="logout" class="text-xs font-bold text-slate-500 hover:text-rose-600 border border-slate-200 hover:border-rose-200 hover:bg-rose-50 bg-white px-3.5 py-1.5 rounded-xl transition shadow-sm">
-                Lock Session
+
+            <div class="flex items-center space-x-2">
+                <a href="/admin" target="_blank" class="text-xs font-bold text-slate-700 hover:text-indigo-700 bg-slate-100 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 px-3 py-1.5 rounded-xl transition flex items-center space-x-1.5 shadow-sm">
+                    <span>🛡️</span>
+                    <span>CPO Audit & SIEM</span>
+                </a>
+                <button @click="logout" class="text-xs font-bold text-slate-500 hover:text-rose-600 border border-slate-200 hover:border-rose-200 hover:bg-rose-50 bg-white px-3 py-1.5 rounded-xl transition shadow-sm">
+                    Lock Station
+                </button>
+            </div>
+        </header>
+
+        <!-- TOP LIVE FACILITY TELEMETRY / METRIC CARDS -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Patient Census</span>
+                <p class="text-xl font-black text-slate-900 mt-0.5 font-mono" x-text="metrics.active_patients || patients.length"></p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+                <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Consultations / Vitals</span>
+                <p class="text-xl font-black text-emerald-700 mt-0.5 font-mono" x-text="metrics.clinical_encounters || 0"></p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+                <span class="text-[10px] font-bold text-purple-600 uppercase tracking-wider">Outbound Referrals</span>
+                <p class="text-xl font-black text-purple-700 mt-0.5 font-mono" x-text="metrics.active_referrals || referrals.length"></p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+                <span class="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Flagged Paper Folders</span>
+                <p class="text-xl font-black text-amber-700 mt-0.5 font-mono" x-text="metrics.flagged_folders || flaggedIntakes.length"></p>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <nav class="flex flex-wrap gap-2 border-b border-slate-200 pb-2">
+            <button @click="switchTab('census')" class="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center space-x-2 shadow-sm"
+                    :class="currentTab === 'census' ? 'bg-emerald-700 text-white' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'">
+                <span>📋</span>
+                <span>Active Patient Directory</span>
             </button>
-        </div>
+            <button @click="switchTab('encounter')" class="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center space-x-2 shadow-sm"
+                    :class="currentTab === 'encounter' ? 'bg-emerald-700 text-white' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'">
+                <span>🩺</span>
+                <span>Clinical Consultation & Vitals</span>
+            </button>
+            <button @click="switchTab('migration')" class="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center space-x-2 shadow-sm"
+                    :class="currentTab === 'migration' ? 'bg-emerald-700 text-white' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'">
+                <span>📄</span>
+                <span>Paper-to-Digital Intake</span>
+                <template x-if="flaggedIntakes.length > 0">
+                    <span class="bg-amber-400 text-amber-950 px-1.5 py-0.2 rounded-full text-[9px] font-black" x-text="flaggedIntakes.length"></span>
+                </template>
+            </button>
+            <button @click="switchTab('referrals')" class="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center space-x-2 shadow-sm"
+                    :class="currentTab === 'referrals' ? 'bg-emerald-700 text-white' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'">
+                <span>🔄</span>
+                <span>Referral & Follow-Up Tracker</span>
+                <span class="bg-purple-100 text-purple-800 px-1.5 py-0.2 rounded-full text-[9px] font-black" x-text="referrals.length"></span>
+            </button>
+        </nav>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            <!-- LEFT COLUMN: Gateway Form & Patient Chart -->
-            <div class="lg:col-span-7 bg-white border border-slate-200 shadow-sm rounded-2xl p-6 flex flex-col justify-between">
+        <!-- Access Error Banner -->
+        <template x-if="accessError">
+            <div class="p-4 bg-rose-50 border-2 border-rose-300 rounded-2xl flex items-center space-x-3 text-rose-900 shadow-sm">
+                <span class="text-2xl">🚫</span>
                 <div>
-                    <div class="flex items-center justify-between mb-5">
-                        <h2 class="text-sm font-extrabold text-slate-800 uppercase tracking-wider flex items-center">
-                            <span class="w-2 h-2 rounded-full bg-blue-500 mr-2"></span>
-                            Patient Record Request
-                        </h2>
-                        <span class="text-[11px] text-slate-500 font-mono font-semibold">Security Profile: Active</span>
-                    </div>
-
-                    <form @submit.prevent="requestAccess(false)" class="space-y-4">
-                        
-                        <!-- PATIENT ID CENSUS DROPDOWN -->
-                        <div x-show="patients.length > 0 && !isOffline" x-cloak>
-                            <label class="block text-xs font-bold text-slate-600 mb-1.5 flex justify-between">
-                                <span>Patient ID</span>
-                                <span class="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full" x-text="patients.length + ' Patients'"></span>
-                            </label>
-                            <select @change="
-                                patientId = $event.target.value; 
-                                let selectedPatient = patients.find(p => p.id === patientId);
-                                if(selectedPatient) wardId = selectedPatient.ward_id;
-                            " class="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm font-mono focus:border-blue-500 focus:bg-white outline-none transition cursor-pointer">
-                                <option value="" disabled selected>-- Select a patient to auto-fill ID & Ward --</option>
-                                <template x-for="p in patients" :key="p.id">
-                                    <option :value="p.id" x-text="p.name + ' (ID: ' + p.id + ')'"></option>
-                                </template>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-bold text-slate-600 mb-1.5">Patient Record ID (Manual Entry)</label>
-                            <input type="text" x-model="patientId" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm font-mono focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition" placeholder="e.g. 250727" required>
-                        </div>
-                        
-                        <!-- Requesting Ward Unit (Hidden for JAJA since they don't use wards) -->
-                        <div x-show="!org.includes('JAJA')" x-cloak>
-                            <label class="block text-xs font-bold text-slate-600 mb-1.5">Requesting Ward Unit</label>
-                            <input type="text" x-model="wardId" :disabled="patients.some(p => p.id === patientId)" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm font-mono focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition disabled:bg-slate-200 disabled:text-slate-500" placeholder="e.g. uch-icu">
-                        </div>
-
-                        <button type="submit" class="w-full font-bold py-2.5 rounded-xl text-xs uppercase tracking-wider transition bg-slate-800 hover:bg-slate-700 text-white shadow-md" x-text="loading ? 'Verifying Authorization...' : 'Fetch Patient Record'"></button>
-                    </form>
+                    <h3 class="font-bold text-sm">Access Denied by Attribute-Based Access Control (ABAC)</h3>
+                    <p class="text-xs font-mono font-medium mt-0.5" x-text="accessError"></p>
                 </div>
+            </div>
+        </template>
 
-                <!-- PATIENT CHART -->
-                <div x-show="accessResult" x-cloak class="mt-6 pt-5 border-t border-slate-100">
-                    <div class="bg-slate-50 border border-emerald-200 rounded-xl p-4 space-y-3">
-                        <div class="flex justify-between items-center pb-2 border-b border-slate-200">
-                            <h3 class="text-xs font-extrabold text-emerald-700 uppercase tracking-wide">🏥 Comprehensive Patient Chart</h3>
-                            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold" x-text="'ID: ' + (accessResult?.patient?.id || patientId)"></span>
-                        </div>
-                        
-                        <div class="grid grid-cols-2 gap-3 text-xs font-mono bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-                            <div>
-                                <span class="text-slate-400 font-bold block text-[10px] tracking-wide">PATIENT NAME</span>
-                                <strong class="text-slate-800 text-sm" x-text="(accessResult?.patient?.first || '') + ' ' + (accessResult?.patient?.last || 'Unknown')"></strong>
-                            </div>
-                            <div>
-                                <span class="text-slate-400 font-bold block text-[10px] tracking-wide">GENDER</span>
-                                <strong class="text-slate-800" x-text="accessResult?.patient?.gender || 'N/A'"></strong>
-                            </div>
-                            <div>
-                                <span class="text-slate-400 font-bold block text-[10px] tracking-wide">FACILITY UNIT</span>
-                                <strong class="text-blue-600" x-text="accessResult?.patient?.organization || 'ORG-UCH'"></strong>
-                            </div>
-                            <div>
-                                <span class="text-slate-400 font-bold block text-[10px] tracking-wide">ASSIGNED WARD</span>
-                                <strong class="text-blue-600" x-text="accessResult?.patient?.ward_id || wardId"></strong>
-                            </div>
-                        </div>
-
-                        <!-- APPEND-ONLY CLINICAL NOTES SECTION -->
-                        <div class="mt-4 pt-4 border-t border-slate-200 space-y-3">
-                            <div class="flex justify-between items-center">
-                                <h4 class="text-xs font-extrabold text-blue-600 uppercase tracking-wide">📝 Append Clinical Note</h4>
-                                <span class="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Immutable Record</span>
-                            </div>
-                            
-                            <div class="space-y-3 mb-2 max-h-40 overflow-y-auto">
-                                <template x-for="(note, index) in clinicalNotes" :key="index">
-                                    <div class="p-2 bg-white rounded border border-slate-200 text-xs text-slate-700">
-                                        <p x-text="note.note_text"></p>
-                                        <div class="mt-1 flex justify-between items-center">
-                                            <span class="text-[9px] text-slate-400 font-mono" x-text="new Date(note.timestamp).toLocaleString()"></span>
-                                            <span x-show="note.offline" class="text-[9px] text-amber-600 bg-amber-50 px-1.5 rounded font-bold">Saved locally • Waiting for sync</span>
-                                        </div>
-                                    </div>
-                                </template>
-                            </div>
-
-                            <textarea x-model="newNote" rows="2" placeholder="Enter new clinical observation..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-800 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition resize-none"></textarea>
-                            
-                            <button @click="appendNote" :disabled="!newNote || isSubmittingNote" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg border border-slate-300 transition shadow-sm disabled:opacity-50">
-                                <span x-text="isSubmittingNote ? 'Appending...' : 'Save Note'"></span>
-                            </button>
-                        </div>
-                    </div>
+        <!-- TAB 1: PATIENT DIRECTORY & CENSUS -->
+        <div x-show="currentTab === 'census'" x-cloak class="space-y-4">
+            <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-wrap justify-between items-center gap-3">
+                <div class="relative flex-1 min-w-[260px]">
+                    <input type="text" x-model="searchQuery" @input.debounce.300ms="fetchPatients()"
+                           placeholder="Search by Patient Name, Folder #, NIN, or BHCPF ID..."
+                           class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs outline-none focus:border-emerald-500 focus:bg-white transition">
+                    <span class="absolute left-3 top-2.5 text-slate-400 text-xs">🔍</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-xs text-slate-500 font-medium">Census: <strong class="text-slate-800" x-text="patients.length"></strong> patients</span>
+                    <button @click="fetchPatients()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition">↻ Refresh</button>
                 </div>
             </div>
 
-            <!-- RIGHT COLUMN: Ledger & Override Rationale -->
-            <div class="lg:col-span-5 bg-white border border-slate-200 shadow-sm rounded-2xl p-6 flex flex-col justify-between">
-                <div>
-                    <h3 class="text-xs font-extrabold text-slate-500 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100">
-                        Gateway Evaluation & Compliance Ledger
-                    </h3>
-
-                    <!-- IDLE STATE -->
-                    <div x-show="!accessResult && !accessError" class="py-12 text-center text-slate-400">
-                        <div class="w-10 h-10 mx-auto mb-3 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-lg shadow-inner">📋</div>
-                        <p class="text-xs font-bold text-slate-500">Ready for clinician inquiry</p>
-                        <p class="text-[11px] text-slate-400 mt-1 font-medium">Security rules will evaluate on submit</p>
-                    </div>
-
-                    <!-- POLICY DENIED -->
-                    <div x-show="accessError" x-cloak class="bg-rose-50 border border-rose-200 rounded-xl p-4 text-left space-y-4 shadow-sm">
-                        <div>
-                            <div class="flex items-center text-rose-700 font-extrabold text-xs mb-1.5 tracking-wide">
-                                <span class="mr-2">⚠️</span> ACCESS REJECTED
-                            </div>
-                            <p class="text-xs text-rose-600 font-mono leading-relaxed" x-text="accessError"></p>
-                        </div>
-                    </div>
-
-                    <!-- LEDGER HASH TRAY -->
-                    <div x-show="accessResult" x-cloak class="space-y-4">
-                        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 shadow-sm">
-                            <div class="flex items-center text-emerald-700 font-extrabold text-xs mb-1 tracking-wide">
-                                <span class="mr-2">✓</span>
-                                <span x-text="isEmergency ? 'EMERGENCY OVERRIDE AUTHORIZED' : 'STANDARD ACCESS GRANTED'"></span>
-                            </div>
-                            <p class="text-[11px] text-emerald-600 font-medium">Identity and cryptographic audit ledger verified.</p>
-                        </div>
-
-                        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5 font-mono text-xs shadow-inner">
-                            <div>
-                                <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wide">Cryptographic Hash (SHA-256)</span>
-                                <span class="text-[11px] text-blue-600 font-bold break-all leading-relaxed" x-text="accessResult?.audit?.current_hash || '787a9deba783aed400279053024e3fa9...'"></span>
-                            </div>
-                            <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200 text-[11px]">
-                                <div>
-                                    <span class="text-[9px] uppercase font-bold text-slate-400 block tracking-wide">Event Timestamp</span>
-                                    <span class="text-slate-600 font-medium truncate block" x-text="accessResult?.audit?.timestamp || new Date().toISOString()"></span>
-                                </div>
-                                <div>
-                                    <span class="text-[9px] uppercase font-bold text-slate-400 block tracking-wide">Audit Status</span>
-                                    <span class="text-emerald-600 font-bold" x-text="isEmergency ? 'OVERRIDDEN' : 'AUTHORIZED'"></span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- MANDATORY POST-TREATMENT REASON -->
-                        <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 space-y-3 mt-4 shadow-sm" x-show="isEmergency">
-                            <h4 class="text-xs font-extrabold text-amber-700 uppercase tracking-wide">📝 Post-Treatment Rationale (REQUIRED)</h4>
-                            <p class="text-[11px] text-amber-700 font-medium leading-relaxed">
-                                You performed an emergency override. You <strong class="font-extrabold text-amber-800">cannot lock or log out</strong> of this session until you select your medical rationale below.
-                            </p>
-                            <select x-model="reason" class="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-amber-900 text-xs font-semibold outline-none shadow-sm cursor-pointer" required>
-                                <option value="" disabled selected>-- Select Authorized Rationale --</option>
-                                <option value="Life-threatening trauma / Code Blue">Life-threatening trauma / Code Blue</option>
-                                <option value="Cross-ward consultation required">Cross-ward consultation required</option>
-                                <option value="Patient crashing / Immediate stabilization">Patient crashing / Immediate stabilization</option>
-                                <option value="Shift handover / Covering colleague">Shift handover / Covering colleague</option>
-                            </select>
-                        </div>
-                    </div>
+            <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-100/75 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
+                                <th class="p-3">Folder #</th>
+                                <th class="p-3">Patient Name</th>
+                                <th class="p-3">Age / Gender</th>
+                                <th class="p-3">Primary Diagnosis / Chief Complaint</th>
+                                <th class="p-3">Blood / Genotype</th>
+                                <th class="p-3">NIN / BHCPF ID</th>
+                                <th class="p-3 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <template x-for="p in patients" :key="p.id">
+                                <tr class="hover:bg-emerald-50/40 transition cursor-pointer" @click="selectPatient(p.id)">
+                                    <td class="p-3 font-mono font-bold text-emerald-800" x-text="p.folder_number || p.id"></td>
+                                    <td class="p-3 font-bold text-slate-900" x-text="p.name"></td>
+                                    <td class="p-3 text-slate-600" x-text="p.age + ' yrs • ' + p.gender"></td>
+                                    <td class="p-3 text-slate-700 font-medium" x-text="p.condition"></td>
+                                    <td class="p-3">
+                                        <span class="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] font-bold" x-text="(p.blood_group || 'O+') + ' • ' + (p.genotype || 'AA')"></span>
+                                    </td>
+                                    <td class="p-3 font-mono text-[11px] text-slate-500" x-text="(p.bhcpf_id || p.nin || 'Unlinked')"></td>
+                                    <td class="p-3 text-right">
+                                        <button @click.stop="selectPatient(p.id)" class="px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg shadow-sm text-[11px]">
+                                            Open Chart →
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
-    </div>
 
-  <!-- OVERRIDE MODAL (GREY "LOCKED" THEME) -->
-    <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-6 z-50" x-show="accessError && showModal" x-cloak x-transition.opacity>
-        <div class="bg-white border-4 border-slate-300 shadow-2xl rounded-3xl max-w-3xl w-full p-12 space-y-8 text-center">
-            
-            <!-- GREY LOCK ICON -->
-            <div class="w-24 h-24 mx-auto rounded-full bg-slate-50 border-4 border-slate-200 flex items-center justify-center text-slate-500 shadow-inner">
-                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                </svg>
-            </div>
-            
-            <!-- SIMPLIFIED TEXT -->
-            <div class="space-y-3">
-                <span class="px-4 py-1.5 rounded-full text-xs font-black tracking-widest bg-slate-100 text-slate-600 border border-slate-200 uppercase shadow-sm">Access Restricted</span>
-                <h3 class="text-3xl font-black text-slate-900 tracking-tight">PATIENT RECORD LOCKED</h3>
-                <p class="text-sm text-slate-700 font-mono font-bold bg-slate-50 p-3 rounded-xl border border-slate-200" x-text="accessError"></p>
-            </div>
-            
-            <!-- SHOW RED OVERRIDE BUTTON ONLY IF DOCTOR *AND* ON DUTY -->
-            <template x-if="isDoctor() && onDuty">
-                <div class="space-y-6">
-                    <p class="text-base text-slate-600 leading-relaxed max-w-xl mx-auto font-semibold">
-                        Patient care is currently blocked by security rules. As an authorized physician, you may engage the emergency protocol to instantly force-open the record.
-                    </p>
-                    <div class="space-y-4 pt-2">
-                        <!-- THE ONLY RED ELEMENT: THE EMERGENCY BUTTON -->
-                        <button @click="requestAccess(true)" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-black py-6 rounded-2xl text-2xl uppercase tracking-widest transition transform active:scale-95 flex items-center justify-center space-x-3 shadow-lg shadow-rose-600/30">
-                            <span>🚨</span><span>EMERGENCY OVERRIDE</span><span>🚨</span>
-                        </button>
-                        <button @click="cancelOverride()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300 font-bold py-4 rounded-xl text-xs uppercase tracking-wider transition shadow-sm">
-                            Cancel & Return
-                        </button>
-                    </div>
-                </div>
-            </template>
-
-            <!-- HIDE OVERRIDE & SHOW GREY RESTRICTED MESSAGE IF OFF DUTY -->
-            <template x-if="!isDoctor() || !onDuty">
-                <div class="space-y-6">
-                    <button @click="cancelOverride()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-4 rounded-xl text-xs uppercase tracking-wider transition shadow-sm">
-                        Dismiss & Return
+        <!-- TAB 2: CLINICAL CONSULTATION & VITALS -->
+        <div x-show="currentTab === 'encounter'" x-cloak class="space-y-4">
+            <template x-if="!activePatient">
+                <div class="bg-white border border-slate-200 rounded-2xl p-12 text-center space-y-3">
+                    <span class="text-4xl">📂</span>
+                    <h3 class="text-base font-bold text-slate-800">No Patient Chart Selected</h3>
+                    <p class="text-xs text-slate-500 max-w-sm mx-auto">Please select a patient from the Active Patient Directory to view triage vitals, medical history, and record outpatient care.</p>
+                    <button @click="currentTab = 'census'" class="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl transition">
+                        Browse Patient Census
                     </button>
                 </div>
             </template>
+
+            <template x-if="activePatient">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                    
+                    <!-- Left: Patient Demographic Dossier -->
+                    <div class="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm h-fit">
+                        <div class="flex items-start justify-between border-b border-slate-100 pb-4">
+                            <div>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800" x-text="'FOLDER #' + (activePatient.folder_number || activePatient.ward_id)"></span>
+                                <h2 class="text-lg font-black text-slate-900 mt-1" x-text="activePatient.name"></h2>
+                                <p class="text-xs text-slate-500 font-medium" x-text="activePatient.age + ' years old • ' + (activePatient.gender === 'F' ? 'Female' : 'Male')"></p>
+                            </div>
+                            <span class="text-xs bg-slate-100 text-slate-700 font-mono font-bold px-2.5 py-1 rounded-lg" x-text="activePatient.blood_group + ' | ' + activePatient.genotype"></span>
+                        </div>
+
+                        <div class="space-y-2 text-xs">
+                            <div class="flex justify-between py-1 border-b border-slate-50">
+                                <span class="text-slate-400 font-medium">Known Allergies:</span>
+                                <span class="font-bold text-rose-700" x-text="activePatient.allergies || 'None reported'"></span>
+                            </div>
+                            <div class="flex justify-between py-1 border-b border-slate-50">
+                                <span class="text-slate-400 font-medium">Active Condition:</span>
+                                <span class="font-bold text-slate-800" x-text="activePatient.condition"></span>
+                            </div>
+                            <div class="flex justify-between py-1 border-b border-slate-50">
+                                <span class="text-slate-400 font-medium">BHCPF ID:</span>
+                                <span class="font-mono text-slate-700" x-text="activePatient.bhcpf_id || 'Not enrolled'"></span>
+                            </div>
+                            <div class="flex justify-between py-1">
+                                <span class="text-slate-400 font-medium">National ID (NIN):</span>
+                                <span class="font-mono text-slate-700" x-text="activePatient.nin || 'Not linked'"></span>
+                            </div>
+                        </div>
+
+                        <!-- Cryptographic Audit Hash -->
+                        <div class="bg-slate-900 text-slate-300 p-3.5 rounded-xl font-mono text-[10px] space-y-1.5 shadow-inner">
+                            <div class="flex justify-between text-slate-400 border-b border-slate-800 pb-1">
+                                <span>ACCESS AUDIT PROOF:</span>
+                                <span class="text-emerald-400">VERIFIED SHA-256</span>
+                            </div>
+                            <p class="text-emerald-300 truncate" x-text="lastAuditHash || '787a9deba783aed400279053024e3fa9...'"></p>
+                            <p class="text-[9px] text-slate-500">NDPA 2023 Tamper-Evident Chained Event</p>
+                        </div>
+                    </div>
+
+                    <!-- Right: Record Outpatient Encounter -->
+                    <div class="lg:col-span-2 space-y-5">
+                        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+                            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                                <h3 class="text-sm font-bold text-slate-900 flex items-center space-x-2">
+                                    <span>🩺</span>
+                                    <span>Record Outpatient Encounter & Triage Vitals</span>
+                                </h3>
+                                <span class="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg">Clinical Consultation</span>
+                            </div>
+
+                            <form @submit.prevent="submitEncounter" class="space-y-4 text-xs">
+                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                                    <div>
+                                        <label class="block font-bold text-slate-600 mb-1">Blood Pressure (mmHg)</label>
+                                        <input type="text" x-model="encounterForm.bp" placeholder="e.g. 120/80" class="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold outline-none focus:border-emerald-500">
+                                    </div>
+                                    <div>
+                                        <label class="block font-bold text-slate-600 mb-1">Temperature (°C)</label>
+                                        <input type="number" step="0.1" x-model="encounterForm.temperature" placeholder="e.g. 37.2" class="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold outline-none focus:border-emerald-500">
+                                    </div>
+                                    <div>
+                                        <label class="block font-bold text-slate-600 mb-1">Pulse (bpm)</label>
+                                        <input type="number" x-model="encounterForm.pulse" placeholder="e.g. 78" class="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold outline-none focus:border-emerald-500">
+                                    </div>
+                                    <div>
+                                        <label class="block font-bold text-slate-600 mb-1">Weight (kg)</label>
+                                        <input type="number" step="0.5" x-model="encounterForm.weight" placeholder="e.g. 64.5" class="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold outline-none focus:border-emerald-500">
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block font-bold text-slate-600 mb-1">Encounter Type</label>
+                                        <select x-model="encounterForm.encounter_type" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold outline-none focus:border-emerald-500">
+                                            <option>General Outpatient (OPD)</option>
+                                            <option>Antenatal Care (ANC)</option>
+                                            <option>Routine Immunization</option>
+                                            <option>Malaria Screening & Fever</option>
+                                            <option>Hypertension / Diabetic Check</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block font-bold text-slate-600 mb-1">Malaria Rapid Diagnostic Test (mRDT)</label>
+                                        <select x-model="encounterForm.rdt_result" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold outline-none focus:border-emerald-500">
+                                            <option>Not Tested</option>
+                                            <option>Positive (P. falciparum)</option>
+                                            <option>Negative</option>
+                                            <option>Invalid</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block font-bold text-slate-600 mb-1">Clinical Assessment & Observations</label>
+                                    <textarea rows="3" x-model="encounterForm.clinical_assessment" placeholder="Document symptoms, physical exam findings, and clinical decision..." class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs outline-none focus:border-emerald-500" required></textarea>
+                                </div>
+
+                                <div>
+                                    <label class="block font-bold text-slate-600 mb-1">Prescription & Dispensed Medications</label>
+                                    <input type="text" x-model="encounterForm.prescription" placeholder="e.g. Coartem 80/480mg, Paracetamol 500mg, ORS..." class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs outline-none focus:border-emerald-500">
+                                </div>
+
+                                <button type="submit" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-2.5 rounded-xl transition shadow-sm text-xs">
+                                    Save Clinical Encounter (Auto-Chained to Central Gateway)
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Past Encounters History -->
+                        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+                            <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Clinical Encounter Timeline</h4>
+                            <div class="space-y-3 max-h-[300px] overflow-y-auto">
+                                <template x-for="enc in activePatientEncounters" :key="enc.id">
+                                    <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs">
+                                        <div class="flex justify-between items-center">
+                                            <span class="font-bold text-slate-900" x-text="enc.encounter_type"></span>
+                                            <span class="text-[10px] text-slate-500" x-text="enc.timestamp"></span>
+                                        </div>
+                                        <div class="flex space-x-3 text-[11px] font-mono font-bold text-emerald-800 bg-emerald-50/70 p-1.5 rounded">
+                                            <span>BP: <span x-text="enc.bp || '120/80'"></span></span>
+                                            <span>Temp: <span x-text="enc.temperature || '36.8'"></span>°C</span>
+                                            <span>RDT: <span x-text="enc.rdt_result || 'N/A'"></span></span>
+                                        </div>
+                                        <p class="text-slate-700 font-medium" x-text="enc.clinical_assessment"></p>
+                                        <template x-if="enc.prescription">
+                                            <p class="text-[11px] text-emerald-700 font-bold">Rx: <span x-text="enc.prescription"></span></p>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </template>
         </div>
-        
-    </div>  <!-- HACKATHON DEMO CONTROLS -->
-    <div class="fixed bottom-4 right-4 bg-slate-800 text-white p-4 rounded-xl shadow-2xl border border-slate-700 space-y-3 z-[60] text-xs" x-show="token" x-cloak>
-        <div class="font-bold text-slate-300 uppercase tracking-wider mb-2 border-b border-slate-600 pb-1">Demo Simulator</div>
-        <div class="flex items-center justify-between space-x-4">
+
+        <!-- TAB 3: PAPER-TO-DIGITAL MIGRATION & REVIEW QUEUE -->
+        <div x-show="currentTab === 'migration'" x-cloak class="space-y-6">
+            
+            <!-- Flagged Folders Review Queue -->
+            <div class="bg-amber-50/80 border-2 border-amber-300 rounded-2xl p-5 shadow-sm space-y-3">
+                <div class="flex justify-between items-center border-b border-amber-200 pb-2">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-lg">⚠️</span>
+                        <h3 class="text-sm font-bold text-amber-950 uppercase tracking-wide">Clinical Review Queue: Flagged Paper Records</h3>
+                    </div>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900" x-text="flaggedIntakes.length + ' Folders Awaiting Nurse Sign-Off'"></span>
+                </div>
+                <p class="text-xs text-amber-900 leading-relaxed">
+                    Under WardVault's safety policy, ambiguous, smudged, or illegible handwriting transcribed by data-entry clerks is paused until Nurse Folake or Dr. Raphael reviews the physical folder.
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                    <template x-for="f in flaggedIntakes" :key="f.id">
+                        <div class="bg-white p-3.5 rounded-xl border border-amber-200 shadow-sm space-y-2 text-xs">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <span class="font-mono font-bold text-emerald-800 text-[11px]" x-text="'FOLDER #' + f.folder_number"></span>
+                                    <h4 class="font-bold text-slate-900 text-sm" x-text="f.patient_name"></h4>
+                                </div>
+                                <span class="bg-rose-100 text-rose-800 text-[9px] font-bold px-2 py-0.5 rounded">Action Required</span>
+                            </div>
+                            <div class="bg-amber-50/70 p-2 rounded-lg border border-amber-100 text-[11px] text-amber-900">
+                                <strong>Transcription Alert:</strong> <span x-text="f.review_notes"></span>
+                            </div>
+                            <div class="flex justify-between items-center pt-1">
+                                <span class="text-[10px] text-slate-400" x-text="'Transcribed by ' + f.transcribed_by"></span>
+                                <button @click="resolveFlaggedFolder(f.id)" class="px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg text-xs transition shadow-sm">
+                                    ✓ Verify & Sign Off
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Paper Folder Transcription Form -->
+            <div class="max-w-2xl mx-auto bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-5">
+                <div class="border-b border-slate-100 pb-3">
+                    <span class="text-xs font-bold text-blue-700 uppercase tracking-wider">Intake Station</span>
+                    <h3 class="text-lg font-black text-slate-900 mt-0.5">Transcribe Paper Patient Folder</h3>
+                    <p class="text-xs text-slate-500">Digitize historical physical folders into WardVault while preserving original retention copies.</p>
+                </div>
+
+                <form @submit.prevent="submitPaperMigration" class="space-y-4 text-xs">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block font-bold text-slate-600 mb-1">Physical Folder / Card Number</label>
+                            <input type="text" x-model="migrationForm.folder_number" placeholder="e.g. FL-4091 or MED-204" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono font-bold outline-none focus:border-emerald-500" required>
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-600 mb-1">National Identity Number (NIN)</label>
+                            <input type="text" x-model="migrationForm.nin" placeholder="11-digit National ID" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono outline-none focus:border-emerald-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block font-bold text-slate-600 mb-1">First Name</label>
+                            <input type="text" x-model="migrationForm.first" placeholder="e.g. Adewale" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl outline-none focus:border-emerald-500" required>
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-600 mb-1">Last / Family Name</label>
+                            <input type="text" x-model="migrationForm.last" placeholder="e.g. Ogunleye" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl outline-none focus:border-emerald-500" required>
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-600 mb-1">Age & Gender</label>
+                            <div class="flex space-x-2">
+                                <input type="number" x-model="migrationForm.age" placeholder="Age" class="w-16 p-2.5 bg-slate-50 border border-slate-300 rounded-xl outline-none focus:border-emerald-500" required>
+                                <select x-model="migrationForm.gender" class="flex-1 p-2.5 bg-slate-50 border border-slate-300 rounded-xl outline-none focus:border-emerald-500">
+                                    <option value="M">Male</option>
+                                    <option value="F">Female</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block font-bold text-slate-600 mb-1">Active Condition or Ongoing Treatment</label>
+                        <input type="text" x-model="migrationForm.condition" placeholder="e.g. Hypertensive Follow-up, Antenatal Booking, Asthma..." class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl outline-none focus:border-emerald-500" required>
+                    </div>
+
+                    <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+                        <label class="flex items-center space-x-2.5 cursor-pointer">
+                            <input type="checkbox" x-model="migrationForm.flagged_for_review" class="w-4 h-4 text-amber-600 rounded">
+                            <span class="font-bold text-amber-900 text-xs">⚠️ Flag Folder for Clinical Review (Illegible Handwriting / Ambiguous Dosing)</span>
+                        </label>
+                        <p class="text-[11px] text-amber-800 leading-relaxed pl-6">
+                            Data-entry officers must never invent or guess unreadable doctor or nurse notes. Flagging pauses clinical finalization until Nurse In-Charge confirms the original folder.
+                        </p>
+                        <template x-if="migrationForm.flagged_for_review">
+                            <input type="text" x-model="migrationForm.review_notes" placeholder="Describe the ambiguous or smudged writing (e.g. dosage illegible on page 2)..." class="w-full mt-2 p-2 bg-white border border-amber-300 rounded-lg text-xs outline-none focus:border-amber-500 text-amber-900">
+                        </template>
+                    </div>
+
+                    <button type="submit" class="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 rounded-xl transition shadow-sm text-xs">
+                        Complete Paper-to-Digital Transcription & Indexing
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- TAB 4: REFERRAL & FOLLOW-UP TRACKER (REGISTRY + FORM) -->
+        <div x-show="currentTab === 'referrals'" x-cloak class="space-y-6">
+            
+            <!-- Active Referrals Registry Table -->
+            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+                <div class="border-b border-slate-100 pb-3 flex justify-between items-center">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900">Primary-to-Secondary Care Coordination Registry</h3>
+                        <p class="text-xs text-slate-500">Track outbound patient transfers from this PHC to General Hospitals or UCH and record closed-loop outcomes.</p>
+                    </div>
+                    <span class="text-xs font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg" x-text="referrals.length + ' Outbound Referrals'"></span>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-100/75 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
+                                <th class="p-3">Ref ID</th>
+                                <th class="p-3">Patient</th>
+                                <th class="p-3">Destination Secondary Facility</th>
+                                <th class="p-3">Urgency</th>
+                                <th class="p-3">Transfer Reason</th>
+                                <th class="p-3">Status Lifecycle</th>
+                                <th class="p-3 text-right">Advance Care</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <template x-for="r in referrals" :key="r.id">
+                                <tr class="hover:bg-slate-50 transition">
+                                    <td class="p-3 font-mono font-bold text-purple-900" x-text="'#REF-' + r.id"></td>
+                                    <td class="p-3">
+                                        <div class="font-bold text-slate-900" x-text="r.patient_name"></div>
+                                        <div class="text-[10px] text-slate-400 font-mono" x-text="r.folder_number || r.patient_id"></div>
+                                    </td>
+                                    <td class="p-3 font-semibold text-slate-800" x-text="r.destination_facility"></td>
+                                    <td class="p-3">
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                                              :class="r.urgency === 'Emergency' ? 'bg-red-100 text-red-800 border border-red-200' : r.urgency === 'Urgent' ? 'bg-orange-100 text-orange-800 border border-orange-200' : 'bg-slate-100 text-slate-700 border border-slate-200'"
+                                              x-text="r.urgency"></span>
+                                    </td>
+                                    <td class="p-3 text-slate-600 max-w-xs truncate" x-text="r.reason"></td>
+                                    <td class="p-3">
+                                        <span class="px-2.5 py-1 rounded-full text-[10px] font-bold"
+                                              :class="r.status === 'Completed' ? 'bg-emerald-100 text-emerald-800' : r.status === 'Feedback Received' ? 'bg-blue-100 text-blue-800' : r.status === 'Attended Secondary Facility' ? 'bg-amber-100 text-amber-800' : 'bg-purple-100 text-purple-800'"
+                                              x-text="r.status"></span>
+                                    </td>
+                                    <td class="p-3 text-right">
+                                        <template x-if="r.status === 'Referred'">
+                                            <button @click="advanceReferral(r.id, 'Attended Secondary Facility')" class="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded text-[11px] shadow-sm">
+                                                Mark Attended →
+                                            </button>
+                                        </template>
+                                        <template x-if="r.status === 'Attended Secondary Facility'">
+                                            <button @click="advanceReferral(r.id, 'Feedback Received')" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded text-[11px] shadow-sm">
+                                                Log Feedback →
+                                            </button>
+                                        </template>
+                                        <template x-if="r.status === 'Feedback Received'">
+                                            <button @click="advanceReferral(r.id, 'Completed')" class="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded text-[11px] shadow-sm">
+                                                Complete Care ✓
+                                            </button>
+                                        </template>
+                                        <template x-if="r.status === 'Completed'">
+                                            <span class="text-emerald-700 font-bold text-[11px]">✓ Closed Loop</span>
+                                        </template>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Create Outbound Referral Form -->
+            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+                <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Issue New Outbound Transfer Slip</h4>
+
+                <form @submit.prevent="submitReferral" class="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
+                    <div>
+                        <label class="block font-bold text-slate-600 mb-1">Patient</label>
+                        <select x-model="referralForm.patient_id" class="w-full p-2 bg-white border border-slate-300 rounded-lg font-bold outline-none" required>
+                            <option value="">Select patient to refer...</option>
+                            <template x-for="p in patients" :key="p.id">
+                                <option :value="p.id" x-text="p.name + ' (' + (p.folder_number || p.id) + ')'"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-600 mb-1">Destination Secondary Facility</label>
+                        <select x-model="referralForm.destination_facility" class="w-full p-2 bg-white border border-slate-300 rounded-lg font-bold outline-none">
+                            <option>University College Hospital (UCH) Ibadan</option>
+                            <option>Adeoyo State Specialist Hospital</option>
+                            <option>Oyo General Hospital</option>
+                            <option>Federal Medical Centre (FMC)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-600 mb-1">Clinical Urgency</label>
+                        <select x-model="referralForm.urgency" class="w-full p-2 bg-white border border-slate-300 rounded-lg font-bold outline-none">
+                            <option value="Routine">Routine Elective</option>
+                            <option value="Urgent">Urgent / High Priority</option>
+                            <option value="Emergency">Life-Critical Emergency</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="block font-bold text-slate-600 mb-1">Clinical Justification & Transfer Summary</label>
+                        <input type="text" x-model="referralForm.reason" placeholder="e.g. Severe rebound abdominal tenderness in RLQ with fever. Suspected acute appendicitis requiring emergency surgical evaluation..." class="w-full p-2 bg-white border border-slate-300 rounded-lg outline-none focus:border-emerald-500" required>
+                    </div>
+                    <div class="md:col-span-3">
+                        <button type="submit" class="w-full bg-purple-700 hover:bg-purple-800 text-white font-bold py-2 rounded-xl transition text-xs shadow-sm">
+                            Generate & Register Outbound Referral Slip
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- FLOATING RESILIENCE CONTROLS (HACKATHON DEMO) -->
+    <div class="fixed bottom-4 right-4 bg-slate-900 text-white p-3.5 rounded-2xl shadow-2xl border border-slate-700 space-y-2 z-[60] text-xs" x-show="token" x-cloak>
+        <div class="font-bold text-slate-300 uppercase tracking-wider border-b border-slate-700 pb-1 flex justify-between items-center text-[11px]">
+            <span>PHC Resilience Station</span>
+            <span class="text-[9px] bg-slate-800 text-emerald-400 px-1.5 py-0.5 rounded font-mono">USPF 2026</span>
+        </div>
+        <div class="flex items-center justify-between space-x-3 pt-1">
             <span>Network:</span>
-            <button @click="toggleNetwork()" class="px-3 py-1 rounded font-bold transition" :class="isOffline ? 'bg-rose-600' : 'bg-emerald-600'" x-text="isOffline ? 'Wi-Fi OFF' : 'Wi-Fi ON'"></button>
+            <button @click="toggleNetwork()" class="px-2.5 py-1 rounded-lg font-bold transition text-xs shadow-sm" :class="isOffline ? 'bg-amber-600 text-white' : 'bg-emerald-600 text-white'" x-text="isOffline ? 'Wi-Fi OFF (Local Mode)' : 'Wi-Fi ON (Connected)'"></button>
         </div>
-        <div class="text-[10px] text-slate-400 text-center mt-2 border-t border-slate-700 pt-1">
-            Battery API Hardware Audio Sync: ACTIVE
+        <div class="flex items-center justify-between space-x-3 pt-1">
+            <span>Sync Queue:</span>
+            <button @click="syncPendingData()" :disabled="isOffline" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-bold transition text-xs">
+                Sync Now (<span x-text="pendingCount"></span>)
+            </button>
         </div>
     </div>
 
-    <!-- INDEXEDDB & AUDIO HELPER -->
+    <!-- INDEXEDDB STORAGE & SCRIPT ENGINE -->
     <script>
-        class WardVaultDB {
-            constructor() { this.dbName = "WardVaultOfflineDB"; this.dbVersion = 1; this.db = null; }
+        class WardVaultLocalVault {
+            constructor() { this.dbName = "WardVaultPHCOffline"; this.db = null; }
             async init() {
-                return new Promise((resolve, reject) => {
-                    const req = indexedDB.open(this.dbName, this.dbVersion);
-                    req.onerror = (e) => reject(e.target.error);
-                    req.onsuccess = (e) => { this.db = e.target.result; resolve(this.db); };
+                return new Promise((res, rej) => {
+                    const req = indexedDB.open(this.dbName, 2);
                     req.onupgradeneeded = (e) => {
                         const db = e.target.result;
                         if (!db.objectStoreNames.contains("patients")) db.createObjectStore("patients", { keyPath: "id" });
-                        if (!db.objectStoreNames.contains("pending_notes")) db.createObjectStore("pending_notes", { keyPath: "id", autoIncrement: true });
+                        if (!db.objectStoreNames.contains("pending_encounters")) db.createObjectStore("pending_encounters", { keyPath: "id", autoIncrement: true });
+                        if (!db.objectStoreNames.contains("pending_referrals")) db.createObjectStore("pending_referrals", { keyPath: "id", autoIncrement: true });
                     };
+                    req.onsuccess = (e) => { this.db = e.target.result; res(this.db); };
+                    req.onerror = (e) => rej(e.target.error);
                 });
             }
+            savePatient(p) { return this._tx("patients", "readwrite", s => s.put(p)); }
+            getPatient(id) { return this._tx("patients", "readonly", s => s.get(id)); }
+            saveEncounter(enc) { return this._tx("pending_encounters", "readwrite", s => s.add(enc)); }
+            getEncounters() { return this._tx("pending_encounters", "readonly", s => s.getAll()); }
+            clearEncounters() { return this._tx("pending_encounters", "readwrite", s => s.clear()); }
             _tx(store, mode, cb) {
                 return new Promise((res, rej) => {
                     const tx = this.db.transaction(store, mode);
@@ -390,13 +691,8 @@
                     req.onerror = () => rej(req.error);
                 });
             }
-            savePatient(p) { return this._tx("patients", "readwrite", s => s.put(p)); }
-            getPatient(id) { return this._tx("patients", "readonly", s => s.get(id)); }
-            saveNote(n) { return this._tx("pending_notes", "readwrite", s => s.add(n)); }
-            getNotes() { return this._tx("pending_notes", "readonly", s => s.getAll()); }
-            clearNotes() { return this._tx("pending_notes", "readwrite", s => s.clear()); }
         }
-        const localVault = new WardVaultDB();
+        const localVault = new WardVaultLocalVault();
 
         function playAlertTone(type) {
             try {
@@ -405,239 +701,273 @@
                 const gain = audioCtx.createGain();
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
-
                 if (type === 'unplug') {
                     osc.type = 'sawtooth';
                     osc.frequency.setValueAtTime(440, audioCtx.currentTime);
                     gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-                    osc.start();
-                    osc.stop(audioCtx.currentTime + 0.3);
-                } else if (type === 'charging') {
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); 
-                    osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.15); 
-                    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-                    osc.start();
-                    osc.stop(audioCtx.currentTime + 0.35);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.3);
                 } else if (type === 'low') {
                     osc.type = 'square';
-                    osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                    osc.frequency.setValueAtTime(850, audioCtx.currentTime);
                     gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-                    osc.start();
-                    osc.stop(audioCtx.currentTime + 0.15);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.2);
                 }
-            } catch(e) { console.log("Audio Context requires user interaction first"); }
+            } catch(e) {}
         }
 
-        // ALPINE APP
-        function wardVault() {
+        function wardVaultPHC() {
             return {
-                token: null, role: '', username: '', password: 'password123', orgName: 'Central Healthcare', providerId: '',
-                org: '', onDuty: false, 
-                authError: '', accessError: '', loading: false, showModal: false,
-                patientId: '', wardId: '', isEmergency: false, reason: '',
-                accessResult: null, patients: [], clinicalNotes: [], newNote: '', isSubmittingNote: false,
+                token: null, staffName: '', role: '', username: '', password: 'password123', providerId: '', onDuty: true,
+                currentTab: 'census',
+                authError: '', accessError: '', loading: false,
+                searchQuery: '',
+                patients: [],
+                referrals: [],
+                flaggedIntakes: [],
+                metrics: { active_patients: 0, clinical_encounters: 0, active_referrals: 0, flagged_folders: 0 },
+                activePatient: null,
+                activePatientEncounters: [],
+                lastAuditHash: '',
                 
-                // Hackathon & Hardware State
-                failedAttempts: 0, securityAlert: false,
-                isOffline: !navigator.onLine, syncing: false, syncComplete: false,
-                batteryState: 'normal', batteryLevelPct: 100,
-                previousChargingState: null,
+                // Hardware & Offline State
+                isOffline: !navigator.onLine,
+                syncing: false,
+                syncComplete: false,
+                pendingCount: 0,
+                batteryState: 'normal',
+                batteryLevelPct: 100,
+
+                // Forms
+                encounterForm: { bp: '120/80', temperature: 36.8, pulse: 76, weight: 60.0, encounter_type: 'General Outpatient (OPD)', rdt_result: 'Not Tested', clinical_assessment: '', prescription: '' },
+                migrationForm: { folder_number: '', first: '', last: '', age: 30, gender: 'F', condition: '', nin: '', flagged_for_review: false, review_notes: '' },
+                referralForm: { patient_id: '', destination_facility: 'University College Hospital (UCH) Ibadan', urgency: 'Routine', reason: '' },
 
                 async init() {
                     await localVault.init();
-                    
                     window.addEventListener('offline', () => { this.isOffline = true; });
-                    window.addEventListener('online', () => { 
-                        this.isOffline = false; 
-                        this.syncPendingData(); 
-                    });
+                    window.addEventListener('online', () => { this.isOffline = false; this.syncPendingData(); });
 
-                    // Battery API with Audio Hardware Hooks
                     if ('getBattery' in navigator) {
                         navigator.getBattery().then(b => {
-                            this.previousChargingState = b.charging;
-                            this.updateBatteryState(b);
+                            this.batteryLevelPct = Math.round(b.level * 100);
                             b.addEventListener('chargingchange', () => {
-                                if (this.previousChargingState && !b.charging) {
-                                    playAlertTone('unplug'); 
-                                } else if (!this.previousChargingState && b.charging) {
-                                    playAlertTone('charging'); 
-                                }
-                                this.previousChargingState = b.charging;
-                                this.updateBatteryState(b);
-                            });
-                            b.addEventListener('levelchange', () => {
-                                if (!b.charging && b.level <= 0.20) {
-                                    playAlertTone('low'); 
-                                }
-                                this.updateBatteryState(b);
+                                if (!b.charging) playAlertTone('unplug');
+                                this.batteryState = b.charging ? 'normal' : (b.level <= 0.2 ? 'low' : 'running');
                             });
                         });
                     }
                 },
 
-                updateBatteryState(battery) {
-                    this.batteryLevelPct = Math.round(battery.level * 100);
-                    if (battery.charging) {
-                        this.batteryState = 'normal';
-                    } else {
-                        this.batteryState = battery.level <= 0.20 ? 'low' : 'running';
-                    }
-                },
-
-                isDoctor() {
-                    return ['Emergency Medicine', 'Cardiology', 'Neurology', 'Pediatrics', 'Surgery'].includes(this.role);
-                },
-
-                cancelOverride() {
-                    this.showModal = false;
-                    this.isEmergency = false;
-                    this.reason = '';
+                quickLogin(uid) {
+                    this.username = uid;
+                    this.password = 'password123';
+                    this.login();
                 },
 
                 async login() {
                     this.authError = ''; this.loading = true;
                     try {
-                        let params = new URLSearchParams();
+                        const params = new URLSearchParams();
                         params.append('username', this.username);
                         params.append('password', this.password);
-                        let res = await fetch('http://127.0.0.1:8000/api/login', { method: 'POST', body: params });
+                        const res = await fetch('/api/login', { method: 'POST', body: params });
                         if (!res.ok) throw new Error();
-                        
-                        let data = await res.json();
+                        const data = await res.json();
                         this.token = data.access_token;
-                        let payload = JSON.parse(atob(this.token.split('.')[1]));
-                        
-                        this.providerId = payload.sub;
-                        this.role = payload.role;
-                        this.org = payload.org ? payload.org.toUpperCase() : '';
-                        this.onDuty = payload.on_duty;
-                        this.orgName = this.org.includes('JAJA') ? 'JAJA Ambulatory Care' : 'University Clinical Hospital (UCH)';
-                        
-                        this.patientId = ''; 
-                        this.wardId = payload.ward_id || '';
-                        this.accessError = '';
-                        this.accessResult = null;
-                        
-                        await this.fetchPatients();
-                    } catch (err) {
-                        this.authError = 'Staff authentication failed. Invalid credentials or unauthorized station.';
-                    } finally { this.loading = false; }
+                        this.staffName = data.provider.name;
+                        this.role = data.provider.role;
+                        this.providerId = data.provider.id;
+                        this.onDuty = data.provider.on_duty;
+                        await this.refreshAllData();
+                    } catch(e) {
+                        this.authError = "Authentication failed. Incorrect ID or password.";
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                logout() {
+                    this.token = null;
+                    this.activePatient = null;
+                },
+
+                switchTab(tab) {
+                    this.currentTab = tab;
+                    if (tab === 'referrals') this.fetchReferrals();
+                    if (tab === 'migration') this.fetchFlaggedIntakes();
+                    if (tab === 'census') this.fetchPatients();
+                    this.fetchMetrics();
+                },
+
+                async refreshAllData() {
+                    await Promise.all([
+                        this.fetchPatients(),
+                        this.fetchReferrals(),
+                        this.fetchFlaggedIntakes(),
+                        this.fetchMetrics()
+                    ]);
+                },
+
+                async fetchMetrics() {
+                    try {
+                        const res = await fetch('/api/metrics');
+                        if (res.ok) this.metrics = await res.json();
+                    } catch(e) {}
                 },
 
                 async fetchPatients() {
-                    if (this.isOffline) return;
                     try {
-                        let res = await fetch('http://127.0.0.1:8000/api/patients', {
-                            headers: { 'Authorization': `Bearer ${this.token}` }
-                        });
-                        if (res.ok) this.patients = await res.json();
-                    } catch (e) { console.error("Census fetch failed"); }
-                },
-
-                async requestAccess(isOverride = false) {
-                    this.accessError = ''; this.loading = true; this.clinicalNotes = [];
-                    if (isOverride) { this.isEmergency = true; }
-                    
-                    if (this.isOffline) {
-                        setTimeout(async () => {
-                            let cached = await localVault.getPatient(this.patientId);
-                            if (cached) {
-                                this.accessResult = { patient: cached };
-                                let allPending = await localVault.getNotes();
-                                this.clinicalNotes = allPending.filter(n => n.patient_id === this.patientId);
-                            } else {
-                                this.accessError = "Record not found in offline encrypted cache.";
-                            }
-                            this.showModal = false;
-                            this.loading = false;
-                        }, 300);
-                        return;
-                    }
-
-                    try {
-                        let res = await fetch('http://127.0.0.1:8000/api/records/access', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
-                            body: JSON.stringify({ 
-                                patient_id: this.patientId, 
-                                client_ward_id: this.wardId, 
-                                is_emergency: this.isEmergency, 
-                                override_reason: this.isEmergency ? (this.reason || 'Attended to patient during acute crisis') : '' 
-                            })
-                        });
-                        let data = await res.json();
-                        if (!res.ok) throw new Error(data.detail?.message || data.detail || 'Access Denied: Security Policy Violation');
-                        
-                        this.accessResult = data;
-                        await localVault.savePatient(data.patient);
-                        
-                        this.showModal = false;
-                        this.resetSecurity(); 
-                    } catch (err) {
-                        this.accessError = err.message || 'Access Denied: Security Policy Violation';
-                        
-                        if (this.accessError.toLowerCase().includes("not found")) {
-                            this.showModal = false;
-                        } else {
-                            this.failedAttempts++;
-                            
-                            if (this.failedAttempts >= 4) {
-                                this.securityAlert = true;
-                                this.showModal = false;
-                                
-                                fetch('http://127.0.0.1:8000/api/audit/threat', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
-                                    body: JSON.stringify({ patient_id: this.patientId, description: "System blocked 4 consecutive unauthorized access attempts." })
-                                }).catch(e => console.log(e));
-                                
-                            } else if (this.isDoctor()) {
-                                this.showModal = true; 
-                            } else {
-                                this.showModal = false;
-                            }
+                        const url = this.searchQuery ? `/api/patients?q=${encodeURIComponent(this.searchQuery)}` : '/api/patients';
+                        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${this.token}` } });
+                        if (res.ok) {
+                            this.patients = await res.json();
+                            this.patients.forEach(p => localVault.savePatient(p));
                         }
-                    } finally { 
-                        this.loading = false; 
+                    } catch(e) {
+                        console.warn("Using cached offline census");
                     }
                 },
 
-                resetSecurity() {
-                    this.securityAlert = false;
-                    this.failedAttempts = 0;
-                    this.accessError = '';
+                async fetchReferrals() {
+                    try {
+                        const res = await fetch('/api/referrals', { headers: { 'Authorization': `Bearer ${this.token}` } });
+                        if (res.ok) this.referrals = await res.json();
+                    } catch(e) {}
                 },
 
-                async appendNote() {
-                    if (!this.newNote.trim()) return;
-                    this.isSubmittingNote = true;
-                    
+                async fetchFlaggedIntakes() {
+                    try {
+                        const res = await fetch('/api/paper-intakes/flagged', { headers: { 'Authorization': `Bearer ${this.token}` } });
+                        if (res.ok) this.flaggedIntakes = await res.json();
+                    } catch(e) {}
+                },
+
+                async selectPatient(pid) {
+                    this.accessError = '';
+                    try {
+                        const res = await fetch(`/api/patients/${pid}`, { headers: { 'Authorization': `Bearer ${this.token}` } });
+                        if (!res.ok) {
+                            const err = await res.json();
+                            this.accessError = err.detail || "Access restricted by ABAC policy.";
+                            return;
+                        }
+                        const data = await res.json();
+                        this.activePatient = data.patient;
+                        this.activePatientEncounters = data.encounters || [];
+                        this.lastAuditHash = data.audit ? data.audit.current_hash : '';
+                        this.currentTab = 'encounter';
+                    } catch(e) {
+                        this.accessError = "Network error communicating with clinical gateway.";
+                    }
+                },
+
+                async submitEncounter() {
+                    if (!this.activePatient) return;
+                    const payload = {
+                        patient_id: this.activePatient.id,
+                        ...this.encounterForm
+                    };
+
                     if (this.isOffline) {
-                        setTimeout(async () => {
-                            let offlineNote = { patient_id: this.patientId, note_text: this.newNote, timestamp: new Date().toISOString(), offline: true };
-                            await localVault.saveNote(offlineNote);
-                            this.clinicalNotes.push(offlineNote);
-                            this.newNote = '';
-                            this.isSubmittingNote = false;
-                        }, 300);
+                        await localVault.saveEncounter(payload);
+                        this.pendingCount++;
+                        alert("Station is offline. Encounter saved securely to local IndexedDB queue and will auto-sync.");
+                        this.encounterForm.clinical_assessment = '';
+                        this.encounterForm.prescription = '';
                         return;
                     }
-                    
+
                     try {
-                        let res = await fetch('http://127.0.0.1:8000/api/records/notes', {
+                        const res = await fetch('/api/encounters', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
-                            body: JSON.stringify({ patient_id: this.patientId, note_text: this.newNote })
+                            body: JSON.stringify(payload)
                         });
                         if (res.ok) {
-                            this.clinicalNotes.push({ note_text: this.newNote, timestamp: new Date().toISOString(), offline: false });
-                            this.newNote = '';
+                            alert("Clinical encounter recorded and cryptographically logged!");
+                            this.encounterForm.clinical_assessment = '';
+                            this.encounterForm.prescription = '';
+                            this.selectPatient(this.activePatient.id);
+                            this.fetchMetrics();
                         }
-                    } catch (err) {
-                        alert("Failed to append note online.");
-                    } finally { this.isSubmittingNote = false; }
+                    } catch(e) {
+                        alert("Failed to submit encounter.");
+                    }
+                },
+
+                async submitPaperMigration() {
+                    const payload = {
+                        ...this.migrationForm,
+                        is_paper_migration: true
+                    };
+                    try {
+                        const res = await fetch('/api/patients/register', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                            body: JSON.stringify(payload)
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            alert(`Patient Folder ${data.folder_number} successfully transcribed and indexed!`);
+                            this.migrationForm.folder_number = '';
+                            this.migrationForm.first = '';
+                            this.migrationForm.last = '';
+                            this.refreshAllData();
+                            this.currentTab = 'census';
+                        }
+                    } catch(e) {
+                        alert("Migration intake failed.");
+                    }
+                },
+
+                async resolveFlaggedFolder(intakeId) {
+                    try {
+                        const res = await fetch(`/api/paper-intakes/${intakeId}/resolve`, {
+                            method: 'PATCH',
+                            headers: { 'Authorization': `Bearer ${this.token}` }
+                        });
+                        if (res.ok) {
+                            alert("Folder verified against paper chart and cleared for clinical care!");
+                            this.fetchFlaggedIntakes();
+                            this.fetchMetrics();
+                        }
+                    } catch(e) {
+                        alert("Failed to resolve folder.");
+                    }
+                },
+
+                async submitReferral() {
+                    try {
+                        const res = await fetch('/api/referrals', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                            body: JSON.stringify(this.referralForm)
+                        });
+                        if (res.ok) {
+                            alert("Outbound referral slip generated and registered!");
+                            this.referralForm.reason = '';
+                            this.fetchReferrals();
+                            this.fetchMetrics();
+                        }
+                    } catch(e) {
+                        alert("Referral creation failed.");
+                    }
+                },
+
+                async advanceReferral(refId, newStatus) {
+                    try {
+                        const res = await fetch(`/api/referrals/${refId}/status`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                            body: JSON.stringify({ status: newStatus })
+                        });
+                        if (res.ok) {
+                            this.fetchReferrals();
+                            this.fetchMetrics();
+                        }
+                    } catch(e) {
+                        alert("Failed to update referral status.");
+                    }
                 },
 
                 toggleNetwork() {
@@ -646,50 +976,29 @@
                 },
 
                 async syncPendingData() {
-                    let pendingNotes = await localVault.getNotes();
-                    if (pendingNotes.length === 0) return;
-
+                    if (this.isOffline) return;
                     this.syncing = true;
-                    setTimeout(async () => {
-                        try {
-                            for (let note of pendingNotes) {
-                                await fetch('http://127.0.0.1:8000/api/records/notes', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
-                                    body: JSON.stringify({ patient_id: note.patient_id, note_text: note.note_text })
-                                });
+                    try {
+                        const pending = await localVault.getEncounters();
+                        if (pending.length > 0) {
+                            const res = await fetch('/api/sync/batch', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                                body: JSON.stringify({ encounters: pending })
+                            });
+                            if (res.ok) {
+                                await localVault.clearEncounters();
+                                this.pendingCount = 0;
+                                this.syncComplete = true;
+                                this.fetchMetrics();
+                                setTimeout(() => { this.syncComplete = false; }, 3000);
                             }
-                            await localVault.clearNotes();
-                            this.clinicalNotes.forEach(n => n.offline = false);
-                            
-                            this.syncing = false;
-                            this.syncComplete = true;
-                            setTimeout(() => { this.syncComplete = false; }, 3000);
-                        } catch (e) {
-                            this.syncing = false;
                         }
-                    }, 1500);
-                },
-
-                logout() { 
-                    if (this.isEmergency && !this.reason) {
-                        alert("Compliance Interlock Active: Select clinical rationale before locking session.");
-                        return;
+                    } catch(e) {
+                        console.error("Batch sync failed:", e);
+                    } finally {
+                        this.syncing = false;
                     }
-                    this.token = null; 
-                    this.accessResult = null; 
-                    this.patients = [];
-                    this.isEmergency = false; 
-                    this.reason = ''; 
-                    this.showModal = false;
-                    this.password = ''; 
-                    this.username = ''; 
-                    this.org = '';
-                    this.onDuty = false;
-                    this.patientId = ''; 
-                    this.wardId = ''; 
-                    this.accessError = '';
-                    this.failedAttempts = 0;
                 }
             }
         }
