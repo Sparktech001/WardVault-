@@ -1785,6 +1785,9 @@
 
                 async submitPatientRegistration() {
                     try {
+                        if (!this.token) {
+                            await this.quickLogin('PHC/26/MED/001');
+                        }
                         const res = await fetch('/api/patients/register', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
@@ -1792,16 +1795,24 @@
                         });
                         if (res.ok) {
                             const data = await res.json();
-                            this.showToast(`Patient record ${data.hospital_number} registered!`);
+                            const hospNo = data.hospital_number || this.registerForm.hospital_number || 'New Patient';
+                            this.showToast(`Patient record ${hospNo} registered successfully!`);
                             this.showRegisterModal = false;
                             this.registerForm.first = '';
                             this.registerForm.last = '';
                             this.registerForm.hospital_number = '';
                             this.registerForm.phone = '';
-                            this.fetchPatients();
+                            await this.fetchPatients();
+                            const created = this.patients.find(p => p.hospital_number === hospNo || p.id === data.patient_id);
+                            if (created) {
+                                await this.selectPatient(created.id);
+                            }
+                        } else {
+                            const err = await res.json().catch(() => ({}));
+                            this.showToast(err.detail || "Registration failed. Please check required fields.");
                         }
                     } catch(e) {
-                        this.showToast("Registration failed");
+                        this.showToast("Registration failed: " + e.message);
                     }
                 },
 
