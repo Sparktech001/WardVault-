@@ -189,7 +189,7 @@
                     <button @click="currentTab = 'paper'" class="w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg transition"
                         :class="currentTab === 'paper' ? 'sidebar-active' : 'hover:bg-slate-800 text-slate-300'">
                         <span>📋</span>
-                        <span class="flex-1 text-left">Hybrid Paper/Digital</span>
+                        <span class="flex-1 text-left">Physical Card Archive</span>
                     </button>
                 </nav>
 
@@ -235,7 +235,7 @@
                             </button>
                             <button @click="openAdd = false; currentTab = 'paper'" class="w-full text-left px-3 py-2 hover:bg-slate-100 flex items-center space-x-2 border-t border-slate-100">
                                 <span>📋</span>
-                                <span>Digitize Paper Card</span>
+                                <span>Physical Card Registry</span>
                             </button>
                         </div>
                     </div>
@@ -243,7 +243,7 @@
 
                 <!-- Right Telemetry & Status -->
                 <div class="flex items-center space-x-3 text-xs">
-                    <span class="text-slate-600 font-mono text-[11px]">Node: <b class="text-slate-900">ALAKIA-PHC-01</b></span>
+                    <span class="text-slate-600 text-[11px]">Facility: <b class="text-slate-900">Alakia PHC</b></span>
                     <span class="px-2 py-0.5 rounded text-[11px] font-semibold border"
                         :class="isPlugged ? 'bg-slate-100 text-slate-700 border-slate-300' : 'bg-amber-50 text-amber-800 border-amber-300'"
                         x-text="isPlugged ? '⚡ Power: Grid/Solar' : '🔋 Inverter Backup'"></span>
@@ -718,23 +718,60 @@
 
                 </div>
 
-                <!-- TAB 5: HYBRID PAPER/DIGITAL (CLEAN, NO ESSAYS) -->
+                <!-- TAB 5: PHYSICAL PATIENT FOLDER & CARD REGISTRY (NO TECH JARGON) -->
                 <div x-show="currentTab === 'paper'" x-cloak class="space-y-4">
-                    <div class="bg-white border border-slate-300 rounded-lg p-5 space-y-3">
-                        <div>
-                            <h2 class="text-sm font-bold text-slate-900">Local Hybrid Paper/Digital Records</h2>
-                            <p class="text-slate-500 text-xs">Records staff digitize physical hospital cards directly into the local SQLite database. Operates 100% offline with zero internet requirement.</p>
+                    <div class="bg-white border border-slate-300 rounded-lg overflow-hidden">
+                        <div class="px-4 py-3 border-b border-slate-200 flex flex-wrap justify-between items-center gap-2 bg-slate-50">
+                            <div>
+                                <h2 class="text-xs font-bold text-slate-900 uppercase tracking-wide">Physical Patient Folder & Card Registry</h2>
+                                <p class="text-[11px] text-slate-500">Cross-reference index linking hospital physical paper folders with patient medical records.</p>
+                            </div>
+                            <span class="px-2.5 py-1 bg-slate-200 text-slate-800 rounded text-[11px] font-semibold">
+                                Records Filing Room Index
+                            </span>
                         </div>
-                        
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                            <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
-                                <b class="text-slate-900 block text-xs">Physical Paper Card Linked:</b>
-                                <p class="text-slate-600 text-xs">Physical patient cards are retained as legal records while digital entries enable immediate search and longitudinal trend tracking.</p>
-                            </div>
-                            <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
-                                <b class="text-slate-900 block text-xs">Local Storage Integrity:</b>
-                                <p class="text-slate-600 text-xs">All records reside directly on the facility computer in <code class="font-mono text-slate-800">wardvault_clinical.db</code> with cryptographic SHA-256 block auditing.</p>
-                            </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-100 border-b border-slate-200 font-bold text-slate-700">
+                                        <th class="px-4 py-2.5">Folder / Card No.</th>
+                                        <th class="px-4 py-2.5">Patient Full Name</th>
+                                        <th class="px-4 py-2.5">Clinic Cabinet</th>
+                                        <th class="px-4 py-2.5">Filing Shelf Location</th>
+                                        <th class="px-4 py-2.5">Physical Card Status</th>
+                                        <th class="px-4 py-2.5 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200 text-slate-800">
+                                    <template x-for="p in patients" :key="p.id">
+                                        <tr class="hover:bg-slate-50 transition">
+                                            <td class="px-4 py-2.5 font-bold font-mono text-slate-900" x-text="p.hospital_number || p.folder_number || p.id"></td>
+                                            <td class="px-4 py-2.5 font-semibold text-slate-900" x-text="cleanName(p)"></td>
+                                            <td class="px-4 py-2.5">
+                                                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                                                    :class="{
+                                                        'bg-blue-100 text-blue-800': p.ward_id === 'OPD',
+                                                        'bg-purple-100 text-purple-800': p.ward_id === 'ANC',
+                                                        'bg-emerald-100 text-emerald-800': p.ward_id === 'EPI'
+                                                    }"
+                                                    x-text="p.ward_id === 'ANC' ? 'ANC & Maternity' : (p.ward_id === 'EPI' ? 'Child Health & EPI' : 'General OPD')">
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-2.5 text-slate-600 font-mono text-[11px]" x-text="'Rack ' + (p.id ? p.id.slice(-2) : '01') + ' / Shelf ' + (p.ward_id || 'A')"></td>
+                                            <td class="px-4 py-2.5">
+                                                <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                    Archived in Records Room
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-2.5 text-right">
+                                                <button @click="selectPatient(p.id)" class="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded text-[11px] transition">
+                                                    Open Record ↗
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
