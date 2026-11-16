@@ -296,11 +296,48 @@
                     </div>
 
                     <!-- Patients Table -->
-                    <div class="bg-white border border-slate-300 rounded-lg overflow-hidden">
-                        <div class="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                            <span class="font-bold text-slate-800 text-xs" x-text="folderFilteredPatients.length + ' Patient Records on Local File'"></span>
-                            <span class="text-slate-500 text-[11px]">Click 'Open Chart' to start consultation or view visits</span>
+                    <div class="bg-white border border-slate-300 rounded-lg overflow-hidden shadow-xs">
+                        <div class="px-4 py-3 border-b border-slate-200 flex flex-wrap justify-between items-center gap-3 bg-slate-50">
+                            <div class="flex items-center space-x-2">
+                                <span class="font-bold text-slate-800 text-xs" x-text="folderFilteredPatients.length + ' Patient Records on Local File'"></span>
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                                      :class="pageSize === 'ALL' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'"
+                                      x-text="pageSize === 'ALL' ? 'Listing All Records (' + folderFilteredPatients.length + ')' : 'Showing ' + paginatedFolderPatients.length + ' of ' + folderFilteredPatients.length"></span>
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-3">
+                                <!-- Sort Selector -->
+                                <div class="flex items-center space-x-1.5 text-xs">
+                                    <span class="text-slate-500 text-[11px] font-semibold">Sort:</span>
+                                    <select x-model="patientSortBy" class="p-1 px-2 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-700 outline-none focus:border-slate-500">
+                                        <option value="NEWEST">⚡ Newest Registered First</option>
+                                        <option value="NAME_ASC">🔤 Alphabetical (A → Z)</option>
+                                        <option value="HOSP_NO">🔢 Hospital Number</option>
+                                    </select>
+                                </div>
+
+                                <!-- Rows to Show Selector -->
+                                <div class="flex items-center space-x-1 text-xs">
+                                    <span class="text-slate-500 text-[11px] font-semibold">Show:</span>
+                                    <button @click="pageSize = 'ALL'; currentPage = 1" 
+                                        :class="pageSize === 'ALL' ? 'bg-slate-900 text-white font-bold' : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'" 
+                                        class="px-2 py-1 rounded text-[11px] transition">
+                                        All (<span x-text="folderFilteredPatients.length"></span>)
+                                    </button>
+                                    <button @click="pageSize = 25; currentPage = 1" 
+                                        :class="pageSize === 25 ? 'bg-slate-900 text-white font-bold' : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'" 
+                                        class="px-2 py-1 rounded text-[11px] transition">
+                                        25
+                                    </button>
+                                    <button @click="pageSize = 10; currentPage = 1" 
+                                        :class="pageSize === 10 ? 'bg-slate-900 text-white font-bold' : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'" 
+                                        class="px-2 py-1 rounded text-[11px] transition">
+                                        10
+                                    </button>
+                                </div>
+                            </div>
                         </div>
+
                         <div class="overflow-x-auto">
                             <table class="w-full text-left text-xs border-collapse">
                                 <thead>
@@ -314,10 +351,31 @@
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-200">
+                                    <template x-if="paginatedFolderPatients.length === 0">
+                                        <tr>
+                                            <td colspan="6" class="px-4 py-8 text-center text-slate-400 text-xs">
+                                                No patient records match the current filter or search criteria.
+                                            </td>
+                                        </tr>
+                                    </template>
                                     <template x-for="p in paginatedFolderPatients" :key="p.id">
-                                        <tr class="hover:bg-slate-50 transition">
-                                            <td class="px-4 py-2.5 font-bold font-mono text-slate-900" x-text="p.hospital_number || p.folder_number || p.id"></td>
-                                            <td class="px-4 py-2.5 font-semibold text-slate-900" x-text="cleanName(p)"></td>
+                                        <tr :class="recentlyAddedId === p.id ? 'bg-emerald-50/90 font-medium' : 'hover:bg-slate-50 transition'">
+                                            <td class="px-4 py-2.5 font-bold font-mono text-slate-900">
+                                                <div class="flex items-center space-x-1.5">
+                                                    <span x-text="p.hospital_number || p.folder_number || p.id"></span>
+                                                    <template x-if="recentlyAddedId === p.id">
+                                                        <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-600 text-white uppercase tracking-wider">New</span>
+                                                    </template>
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-2.5 font-semibold text-slate-900">
+                                                <div class="flex items-center space-x-1.5">
+                                                    <span x-text="cleanName(p)"></span>
+                                                    <template x-if="p.is_new_digital">
+                                                        <span class="text-[10px] text-slate-400" title="Digital Registered Patient">💻</span>
+                                                    </template>
+                                                </div>
+                                            </td>
                                             <td class="px-4 py-2.5 text-slate-600" x-text="(p.age === 0 ? '6 Weeks' : p.age + ' yrs') + ' • ' + p.gender"></td>
                                             <td class="px-4 py-2.5 font-mono text-slate-700" x-text="(p.blood_group || 'O+') + ' / ' + (p.genotype || 'AA')"></td>
                                             <td class="px-4 py-2.5 text-slate-700" x-text="p.condition"></td>
@@ -330,6 +388,27 @@
                                     </template>
                                 </tbody>
                             </table>
+                        </div>
+
+                        <!-- Table Footer (Pagination / Summary) -->
+                        <div class="px-4 py-2.5 border-t border-slate-200 bg-slate-50 flex flex-wrap justify-between items-center text-xs text-slate-600">
+                            <div>
+                                <span class="font-medium" x-text="'Showing ' + (pageSize === 'ALL' ? folderFilteredPatients.length : paginatedFolderPatients.length) + ' of ' + folderFilteredPatients.length + ' patient records'"></span>
+                                <span x-show="pageSize === 'ALL'" class="ml-1 text-emerald-700 font-semibold text-[11px]">(All listed)</span>
+                            </div>
+
+                            <!-- Page controls if paginated -->
+                            <div x-show="pageSize !== 'ALL' && totalPages > 1" class="flex items-center space-x-1">
+                                <button @click="currentPage = Math.max(1, currentPage - 1)" :disabled="currentPage === 1" 
+                                    class="px-2 py-1 rounded border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-[11px]">
+                                    ‹ Prev
+                                </button>
+                                <span class="px-2 py-0.5 text-[11px] font-semibold text-slate-700" x-text="'Page ' + currentPage + ' of ' + totalPages"></span>
+                                <button @click="currentPage = Math.min(totalPages, currentPage + 1)" :disabled="currentPage === totalPages" 
+                                    class="px-2 py-1 rounded border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-[11px]">
+                                    Next ›
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -1978,6 +2057,9 @@
                 currentTab: 'census',
                 activeFolder: 'ALL',
                 currentPage: 1,
+                patientSortBy: 'NEWEST',
+                pageSize: 'ALL',
+                recentlyAddedId: null,
                 authError: '', accessError: '', loading: false,
                 searchQuery: '',
                 patients: [],
@@ -2143,8 +2225,15 @@
                     } else {
                         raw = `${item || ''} ${last || ''}`.trim();
                     }
-                    const cleaned = raw.replace(/\d+/g, '').replace(/\s+/g, ' ').trim();
-                    return cleaned || 'Patient';
+                    raw = raw.trim();
+                    if (!raw) return 'Patient';
+                    return raw.split(/\s+/).map(w => {
+                        if (!w) return '';
+                        if (w === w.toLowerCase()) {
+                            return w.charAt(0).toUpperCase() + w.slice(1);
+                        }
+                        return w;
+                    }).join(' ');
                 },
 
                 // USER REQUEST: LAB ORDERS (DROP-DOWN + OTHER + VIEW DETAILS)
@@ -2201,18 +2290,43 @@
                         const q = this.searchQuery.toLowerCase().trim();
                         list = list.filter(p => {
                             const fullName = this.cleanName(p).toLowerCase();
+                            const rawName = (p.name || `${p.first || ''} ${p.last || ''}`).toLowerCase();
                             const hosp = (p.hospital_number || p.folder_number || p.id || '').toLowerCase();
                             const nin = (p.nin || '').toLowerCase();
                             const cond = (p.condition || '').toLowerCase();
-                            return fullName.includes(q) || hosp.includes(q) || nin.includes(q) || cond.includes(q);
+                            const phone = (p.phone || '').toLowerCase();
+                            return fullName.includes(q) || rawName.includes(q) || hosp.includes(q) || nin.includes(q) || cond.includes(q) || phone.includes(q);
                         });
                     }
-                    return list;
+                    
+                    return [...list].sort((a, b) => {
+                        if (this.patientSortBy === 'NEWEST') {
+                            const dateA = a.created_at || '';
+                            const dateB = b.created_at || '';
+                            if (dateA && dateB) return dateB.localeCompare(dateA);
+                            return (b.id || '').localeCompare(a.id || '');
+                        } else if (this.patientSortBy === 'HOSP_NO') {
+                            return (a.hospital_number || a.id || '').localeCompare(b.hospital_number || b.id || '');
+                        } else {
+                            // Alphabetical (A to Z)
+                            return this.cleanName(a).localeCompare(this.cleanName(b));
+                        }
+                    });
                 },
 
                 get paginatedFolderPatients() {
-                    const start = (this.currentPage - 1) * 10;
-                    return this.folderFilteredPatients.slice(start, start + 10);
+                    if (this.pageSize === 'ALL' || !this.pageSize) {
+                        return this.folderFilteredPatients;
+                    }
+                    const size = parseInt(this.pageSize) || 25;
+                    const start = (this.currentPage - 1) * size;
+                    return this.folderFilteredPatients.slice(start, start + size);
+                },
+
+                get totalPages() {
+                    if (this.pageSize === 'ALL' || !this.pageSize) return 1;
+                    const size = parseInt(this.pageSize) || 25;
+                    return Math.max(1, Math.ceil(this.folderFilteredPatients.length / size));
                 },
 
                 async quickLogin(id) {
@@ -2878,17 +2992,24 @@
                         if (res.ok) {
                             const data = await res.json();
                             const hospNo = data.hospital_number || this.registerForm.hospital_number || 'New Patient';
-                            this.showToast(`Patient record ${hospNo} registered successfully!`);
+                            const ptName = `${this.registerForm.first} ${this.registerForm.last}`.trim();
+                            this.showToast(`Patient record ${ptName || hospNo} registered successfully!`);
                             this.showRegisterModal = false;
                             this.registerForm.first = '';
                             this.registerForm.last = '';
                             this.registerForm.hospital_number = '';
                             this.registerForm.phone = '';
+                            this.registerForm.condition = 'General Outpatient Care';
+                            
+                            // Immediately ensure the view shows ALL records with newest at the top
+                            this.patientSortBy = 'NEWEST';
+                            this.pageSize = 'ALL';
+                            this.activeFolder = 'ALL';
+                            this.searchQuery = '';
+                            this.recentlyAddedId = data.patient_id;
+                            
                             await this.fetchPatients();
-                            const created = this.patients.find(p => p.hospital_number === hospNo || p.id === data.patient_id);
-                            if (created) {
-                                await this.selectPatient(created.id);
-                            }
+                            this.currentTab = 'census';
                         } else {
                             const err = await res.json().catch(() => ({}));
                             this.showToast(err.detail || "Registration failed. Please check required fields.");

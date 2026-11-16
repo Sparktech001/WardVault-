@@ -276,18 +276,18 @@ async def get_patients(
             search_pattern = f"%{q.strip()}%"
             query = """
                 SELECT id, hospital_number, first, last, name, age, gender, organization, ward_id, clinic, condition,
-                       blood_group, genotype, phone, nin, bhcpf_id, allergies
+                       blood_group, genotype, phone, nin, bhcpf_id, allergies, created_at, is_new_digital
                 FROM patients
                 WHERE name LIKE $1 OR first LIKE $2 OR last LIKE $3 OR hospital_number LIKE $4 OR ward_id LIKE $5 OR nin LIKE $6
-                ORDER BY name ASC LIMIT 300
+                ORDER BY created_at DESC, name COLLATE NOCASE ASC LIMIT 500
             """
             patients = await conn.fetch(query, search_pattern, search_pattern, search_pattern, search_pattern, search_pattern, search_pattern)
         else:
             query = """
                 SELECT id, hospital_number, first, last, name, age, gender, organization, ward_id, clinic, condition,
-                       blood_group, genotype, phone, nin, bhcpf_id, allergies
+                       blood_group, genotype, phone, nin, bhcpf_id, allergies, created_at, is_new_digital
                 FROM patients
-                ORDER BY name ASC LIMIT 300
+                ORDER BY created_at DESC, name COLLATE NOCASE ASC LIMIT 500
             """
             patients = await conn.fetch(query)
 
@@ -308,7 +308,9 @@ async def get_patients(
                 "phone": p.get("phone", ""),
                 "nin": p.get("nin", ""),
                 "bhcpf_id": p.get("bhcpf_id", ""),
-                "allergies": p.get("allergies", "None")
+                "allergies": p.get("allergies", "None"),
+                "created_at": str(p.get("created_at") or ""),
+                "is_new_digital": bool(p.get("is_new_digital", False))
             }
             for p in patients
         ]
